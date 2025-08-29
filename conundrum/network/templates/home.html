@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CONUNDRUM CORNER</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Conundrum Corner</h1>
+
+        <!-- Create Lobby Form -->
+        <div class="form-box">
+            <h2>Create Lobby</h2>
+            <form method="POST" action="{{ url_for('routes.create_lobby') }}">
+                <label for="max_players">Max Players:</label>
+                <input type="number" name="max_players" min="4" max="12" required>
+
+                <label for="game_mode">Select Game Mode:</label>
+                <select name="game_mode" required>
+                    <option value="reverse_guessing">Reverse Guessing</option>
+                    <option value="emoji_translation">Emoji Translation</option>
+                    <option value="bad_advice_hotline">Bad Advice Hotline</option>
+                    <option value="obviously_lies">Obviously Lies</option>
+                </select>
+
+                <button type="submit">Create Lobby</button>
+            </form>
+        </div>
+
+        <hr>
+
+        <!-- Join Lobby Form -->
+        <div class="form-box">
+            <h2>Join Lobby</h2>
+            <form method="POST" action="{{ url_for('routes.join_lobby') }}">
+                <label for="lobby_code">Enter Lobby Code:</label>
+                <input type="text" name="lobby_code" placeholder="e.g. 1234" required>
+                <button type="submit">Join Lobby</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
