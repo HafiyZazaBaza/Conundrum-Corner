@@ -4,19 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CONUNDRUM CORNER</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script> <!-- socket.IO client library -->
 </head>
 <body>
     <div class="container">
         <h1>Conundrum Corner</h1>
 
-        <!-- Create Lobby Form -->
+        <!-- create lobby form -->
         <div class="form-box">
-            <h2>Create Lobby</h2>
-            <form method="POST" action="{{ url_for('routes.create_lobby') }}">
-                <label for="max_players">Max Players:</label>
-                <input type="number" name="max_players" min="4" max="12" required>
+            <h2>CREATE LOBBY</h2>
+            <form id="createLobbyForm">
+                <label for="username">Enter username:</label> <!-- username input -->
+                <input type="text" name="username" placeholder="Your name" required>
 
-                <label for="game_mode">Select Game Mode:</label>
+                <label for="max_players">Number of players:</label> <!-- num_players input -->
+                <input type="number" name="max_players" placeholder="Enter number of players" required>
+
+                <label for="game_mode">Select game mode:</label> <!-- game modes option -->
                 <select name="game_mode" required>
                     <option value="reverse_guessing">Reverse Guessing</option>
                     <option value="emoji_translation">Emoji Translation</option>
@@ -27,18 +31,68 @@
                 <button type="submit">Create Lobby</button>
             </form>
         </div>
+ 
 
         <hr>
 
-        <!-- Join Lobby Form -->
+        <!-- join lobby form -->
         <div class="form-box">
-            <h2>Join Lobby</h2>
-            <form method="POST" action="{{ url_for('routes.join_lobby') }}">
-                <label for="lobby_code">Enter Lobby Code:</label>
+            <h2>JOIN LOBBY</h2>
+            <form id="joinLobbyForm">
+                <label for="username">Enter Username:</label> <!-- username input -->
+                <input type="text" name="username" placeholder="Your name" required>
+
+                <label for="lobby_code">Enter Lobby Code:</label> <!-- code input -->
                 <input type="text" name="lobby_code" placeholder="e.g. 1234" required>
+
                 <button type="submit">Join Lobby</button>
             </form>
         </div>
+
+        <hr>
+        <div id="log"></div>
     </div>
+
+    <script>
+        const socket = io(); // connect to server thru Socket.IO
+
+        // ------------------ create lobby function ------------------
+        document.getElementById("createLobbyForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const username = this.username.value;
+            const maxPlayers = this.max_players.value;
+            const gameMode = this.game_mode.value;
+
+            socket.emit("create_lobby", { username, maxPlayers, gameMode });
+        });
+
+        // ------------------ join lobby function ------------------
+        document.getElementById("joinLobbyForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const username = this.username.value;
+            const lobbyCode = this.lobby_code.value;
+
+            socket.emit("join_lobby", { username, lobbyCode });
+        });
+
+        // ------------------ server response ------------------
+        socket.on("lobby_created", data => {
+            log(`Lobby created! Code: ${data.lobbyCode}, Mode: ${data.gameMode}, Host: ${data.username}`);
+        });
+
+        socket.on("lobby_joined", data => {
+            log(`${data.username} joined lobby: ${data.lobbyCode}`);
+        });
+
+        socket.on("error_message", data => {
+            log(`Error: ${data.message}`);
+        });
+
+        // ------------------ logging ------------------
+        function log(msg) {
+            const logDiv = document.getElementById("log");
+            logDiv.innerText += msg + "\n";
+        }
+    </script>
 </body>
 </html>
