@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Reverse Guessing Game</title>
+  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+  <h1>Reverse Guessing Game</h1>
+
+  <input id="username" placeholder="Your name">
+  <input id="room" placeholder="Room code">
+  <button onclick="startGame()">Start Game</button>
+
+  <div id="answer"></div>
+  <input id="question" placeholder="Write a question">
+  <button onclick="submitQuestion()">Submit Question</button>
+
+  <div id="asked"></div>
+  <input id="guess" placeholder="Your guess">
+  <button onclick="makeGuess()">Guess</button>
+
+  <pre id="log"></pre>
+
+  <script>
+    const socket = io();
+
+    function startGame() {
+      const room = document.getElementById("room").value;
+      const username = document.getElementById("username").value;
+      socket.emit("reverse_start", {room, username});
+    }
+
+    function submitQuestion() {
+      const room = document.getElementById("room").value;
+      const username = document.getElementById("username").value;
+      const question = document.getElementById("question").value;
+      socket.emit("reverse_submit_question", {room, username, question});
+    }
+
+    function makeGuess() {
+      const room = document.getElementById("room").value;
+      const username = document.getElementById("username").value;
+      const guess = document.getElementById("guess").value;
+      socket.emit("reverse_guess", {room, username, guess});
+    }
+
+    socket.on("reverse_new_answer", data => {
+      document.getElementById("answer").innerText = "Answer: " + data.answer;
+    });
+
+    socket.on("reverse_question_submitted", data => {
+      log(${data.username} submitted: ${data.question});
+    });
+
+    socket.on("reverse_ask_player", data => {
+      document.getElementById("asked").innerText =
+        ${data.author} asks: ${data.question};
+      log(Question assigned to: ${data.target});
+    });
+
+    socket.on("reverse_correct", data => {
+      log(${data.guesser} guessed correctly! Answer: ${data.answer});
+      log("Scores: " + JSON.stringify(data.scores));
+    });
+
+    socket.on("reverse_wrong", data => {
+      log(${data.username} guessed wrong! Correct answer: ${data.answer});
+    });
+
+    socket.on("reverse_round_end", data => {
+      log("Round finished! Final scores:");
+      log(JSON.stringify(data.scores));
+    });
+
+    function log(msg) {
+      document.getElementById("log").innerText += msg + "\n";
+    }
+  </script>
+</body>
+</html>
