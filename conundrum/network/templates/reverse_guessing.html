@@ -1,80 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Reverse Guessing Game</title>
-  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <title>Reverse Guessing Game</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-  <h1>Reverse Guessing Game</h1>
+    <h1>Reverse Guessing Game</h1>
 
-  <input id="username" placeholder="Your name">
-  <input id="room" placeholder="Room code">
-  <button onclick="startGame()">Start Game</button>
+    <button onclick="startRound()">Start Round</button>
+    <div id="answer"></div>
 
-  <div id="answer"></div>
-  <input id="question" placeholder="Write a question">
-  <button onclick="submitQuestion()">Submit Question</button>
+    <h3>Submit a Question</h3>
+    <input id="questionInput" placeholder="Write your question">
+    <button onclick="submitQuestion()">Submit</button>
 
-  <div id="asked"></div>
-  <input id="guess" placeholder="Your guess">
-  <button onclick="makeGuess()">Guess</button>
+    <h3>Guess the Answer</h3>
+    <input id="guessInput" placeholder="Your guess">
+    <button onclick="submitGuess()">Guess</button>
 
-  <pre id="log"></pre>
+    <div id="gameLog"></div>
 
-  <script>
-    const socket = io();
+    <script>
+        const socket = io();
+        const room = "reverse_room";
 
-    function startGame() {
-      const room = document.getElementById("room").value;
-      const username = document.getElementById("username").value;
-      socket.emit("reverse_start", {room, username});
-    }
+        function startRound() {
+            socket.emit("reverse_start_round", { room });
+        }
 
-    function submitQuestion() {
-      const room = document.getElementById("room").value;
-      const username = document.getElementById("username").value;
-      const question = document.getElementById("question").value;
-      socket.emit("reverse_submit_question", {room, username, question});
-    }
+        function submitQuestion() {
+            const question = document.getElementById("questionInput").value;
+            socket.emit("reverse_submit_question", { room, question });
+        }
 
-    function makeGuess() {
-      const room = document.getElementById("room").value;
-      const username = document.getElementById("username").value;
-      const guess = document.getElementById("guess").value;
-      socket.emit("reverse_guess", {room, username, guess});
-    }
+        function submitGuess() {
+            const guess = document.getElementById("guessInput").value;
+            socket.emit("reverse_guess_answer", { room, guess });
+        }
 
-    socket.on("reverse_new_answer", data => {
-      document.getElementById("answer").innerText = "Answer: " + data.answer;
-    });
+        // Listen to events
+        socket.on("reverse_new_answer", data => {
+            document.getElementById("answer").innerText = "Answer: " + data.answer;
+        });
 
-    socket.on("reverse_question_submitted", data => {
-      log(${data.username} submitted: ${data.question});
-    });
+        socket.on("reverse_ask_player", data => {
+            log(`${data.target}, guess this: ${data.question} (from ${data.author})`);
+        });
 
-    socket.on("reverse_ask_player", data => {
-      document.getElementById("asked").innerText =
-        ${data.author} asks: ${data.question};
-      log(Question assigned to: ${data.target});
-    });
+        socket.on("reverse_correct", data => {
+            log(`${data.guesser} guessed correctly! Scores: ${JSON.stringify(data.scores)}`);
+        });
 
-    socket.on("reverse_correct", data => {
-      log(${data.guesser} guessed correctly! Answer: ${data.answer});
-      log("Scores: " + JSON.stringify(data.scores));
-    });
+        socket.on("reverse_wrong", data => {
+            log(`${data.username} guessed wrong. Correct answer was ${data.answer}`);
+        });
 
-    socket.on("reverse_wrong", data => {
-      log(${data.username} guessed wrong! Correct answer: ${data.answer});
-    });
-
-    socket.on("reverse_round_end", data => {
-      log("Round finished! Final scores:");
-      log(JSON.stringify(data.scores));
-    });
-
-    function log(msg) {
-      document.getElementById("log").innerText += msg + "\n";
-    }
-  </script>
+        function log(msg) {
+            document.getElementById("gameLog").innerHTML += "<p>" + msg + "</p>";
+        }
+    </script>
 </body>
 </html>

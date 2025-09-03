@@ -1,1 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bad Advice Hotline</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Bad Advice Hotline</h1>
+
+    <button onclick="startRound()">Start Round</button>
+    <div id="question"></div>
+
+    <h3>Submit Advice</h3>
+    <input id="answerInput" placeholder="Bad advice here">
+    <button onclick="submitAnswer()">Submit</button>
+
+    <h3>Vote for the Funniest</h3>
+    <div id="voteArea"></div>
+
+    <div id="results"></div>
+
+    <script>
+        const socket = io();
+        const room = "badadvice_room";
+
+        function startRound() {
+            socket.emit("badadvice_start_round", { room });
+        }
+
+        function submitAnswer() {
+            const answer = document.getElementById("answerInput").value;
+            socket.emit("badadvice_submit_answer", { room, answer });
+        }
+
+        function castVote(voted_sid) {
+            socket.emit("badadvice_cast_vote", { room, voted_sid });
+        }
+
+        // Listen
+        socket.on("badadvice_new_question", data => {
+            document.getElementById("question").innerText = "Question: " + data.question;
+        });
+
+        socket.on("badadvice_start_voting", data => {
+            let html = "<h3>Vote for your favorite:</h3>";
+            for (const sid in data.answers) {
+                html += `<button onclick="castVote('${sid}')">${data.answers[sid]}</button><br>`;
+            }
+            document.getElementById("voteArea").innerHTML = html;
+        });
+
+        socket.on("badadvice_round_result", data => {
+            document.getElementById("results").innerText = "Scores: " + JSON.stringify(data.scores);
+        });
+    </script>
+</body>
+</html>
+
 
