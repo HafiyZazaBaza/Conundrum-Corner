@@ -5,6 +5,8 @@ socketio = SocketIO()  # global SocketIO object
 
 def create_app():
     app = Flask(__name__)
+    template_folder="network/templates",  # tell Flask where to find templates
+    static_folder="network/static"        # tell Flask where to find CSS/JS
     app.config['SECRET_KEY'] = "super-secret-key"
 
     # Register blueprints
