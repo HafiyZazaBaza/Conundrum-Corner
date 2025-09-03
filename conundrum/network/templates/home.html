@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CONUNDRUM CORNER</title>
-    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script> <!-- socket.IO client library -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script> <!-- latest socket.IO client -->
 </head>
 <body>
     <div class="container">
@@ -14,13 +14,13 @@
         <div class="form-box">
             <h2>CREATE LOBBY</h2>
             <form id="createLobbyForm">
-                <label for="username">Enter username:</label> <!-- username input -->
+                <label for="username">Enter username:</label>
                 <input type="text" name="username" placeholder="Your name" required>
 
-                <label for="max_players">Number of players:</label> <!-- num_players input -->
+                <label for="max_players">Number of players:</label>
                 <input type="number" name="max_players" placeholder="Enter number of players" required>
 
-                <label for="game_mode">Select game mode:</label> <!-- game modes option -->
+                <label for="game_mode">Select game mode:</label>
                 <select name="game_mode" required>
                     <option value="reverse_guessing">Reverse Guessing</option>
                     <option value="emoji_translation">Emoji Translation</option>
@@ -31,7 +31,6 @@
                 <button type="submit">Create Lobby</button>
             </form>
         </div>
- 
 
         <hr>
 
@@ -39,10 +38,10 @@
         <div class="form-box">
             <h2>JOIN LOBBY</h2>
             <form id="joinLobbyForm">
-                <label for="username">Enter Username:</label> <!-- username input -->
+                <label for="username">Enter Username:</label>
                 <input type="text" name="username" placeholder="Your name" required>
 
-                <label for="lobby_code">Enter Lobby Code:</label> <!-- code input -->
+                <label for="lobby_code">Enter Lobby Code:</label>
                 <input type="text" name="lobby_code" placeholder="e.g. 1234" required>
 
                 <button type="submit">Join Lobby</button>
@@ -54,9 +53,9 @@
     </div>
 
     <script>
-        const socket = io(); // connect to server thru Socket.IO
+        const socket = io();
 
-        // ------------------ create lobby function ------------------
+        // ------------------ create lobby ------------------
         document.getElementById("createLobbyForm").addEventListener("submit", function(e) {
             e.preventDefault();
             const username = this.username.value;
@@ -66,7 +65,7 @@
             socket.emit("create_lobby", { username, maxPlayers, gameMode });
         });
 
-        // ------------------ join lobby function ------------------
+        // ------------------ join lobby ------------------
         document.getElementById("joinLobbyForm").addEventListener("submit", function(e) {
             e.preventDefault();
             const username = this.username.value;
@@ -75,18 +74,44 @@
             socket.emit("join_lobby", { username, lobbyCode });
         });
 
-        // ------------------ server response ------------------
+        // ------------------ server responses ------------------
         socket.on("lobby_created", data => {
-            log(`Lobby created! Code: ${data.lobbyCode}, Mode: ${data.gameMode}, Host: ${data.username}`);
+            log(`✅ Lobby created! Code: ${data.lobbyCode}, Mode: ${data.gameMode}, Host: ${data.username}`);
+            redirectToGame(data.gameMode, data.lobbyCode, data.username);
         });
 
         socket.on("lobby_joined", data => {
-            log(`${data.username} joined lobby: ${data.lobbyCode}`);
+            log(`👤 ${data.username} joined lobby: ${data.lobbyCode}`);
+            redirectToGame(data.gameMode, data.lobbyCode, data.username);
         });
 
         socket.on("error_message", data => {
-            log(`Error: ${data.message}`);
+            log(`❌ Error: ${data.message}`);
         });
+
+        // ------------------ redirect to game page ------------------
+        function redirectToGame(gameMode, lobbyCode, username) {
+            let gamePage = "";
+            switch (gameMode) {
+                case "reverse_guessing":
+                    gamePage = "reverse_guessing.html";
+                    break;
+                case "emoji_translation":
+                    gamePage = "emoji_translation.html";
+                    break;
+                case "bad_advice_hotline":
+                    gamePage = "bad_advice_hotline.html";
+                    break;
+                case "obviously_lies":
+                    gamePage = "obviously_lies.html";
+                    break;
+                default:
+                    return;
+            }
+
+            // attach query params so the game page knows who you are
+            window.location.href = `${gamePage}?username=${encodeURIComponent(username)}&lobby=${encodeURIComponent(lobbyCode)}`;
+        }
 
         // ------------------ logging ------------------
         function log(msg) {
