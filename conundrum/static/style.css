@@ -1,0 +1,119 @@
+/* ---------- General Page ---------- */
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #074ca8; /* main background */
+    color: #222;
+}
+
+/* ---------- Container ---------- */
+.container {
+    max-width: 900px;
+    margin: 50px auto;
+    padding: 20px;
+    text-align: center;
+}
+
+/* ---------- Headings ---------- */
+h1 {
+    color: #ffffff;
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+}
+
+h2 {
+    color: #003a88;
+    margin-bottom: 15px;
+}
+
+/* ---------- Forms Wrapper (Flexbox) ---------- */
+.forms-wrapper {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 20px 0;
+}
+
+/* ---------- Form Box ---------- */
+.form-box {
+    background-color: #ececec; /* form background */
+    padding: 25px;
+    flex: 1; /* equal width for both boxes */
+    border-radius: 15px;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+    text-align: left;
+
+    /* static border */
+    border: 2px solid #003a88;
+}
+
+/* ---------- Form Labels & Inputs ---------- */
+label {
+    display: block;
+    margin: 10px 0 5px;
+    font-weight: bold;
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+input:focus, select:focus {
+    border-color: #003a88;
+    outline: none;
+    box-shadow: 0 0 6px rgba(0,58,136,0.5);
+}
+
+/* ---------- Buttons ---------- */
+button {
+    width: 100%;
+    padding: 12px;
+    background-color: #003a88; /* button background */
+    color: #fff;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.3s ease;
+}
+
+button:hover {
+    background-color: #002b66;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+}
+
+/* ---------- Divider ---------- */
+hr {
+    border: none;
+    border-top: 2px solid #ccc;
+    margin: 30px 0;
+}
+
+/* ---------- Log Section ---------- */
+#log {
+    background: #ececec;
+    padding: 15px;
+    border-radius: 12px;
+    text-align: left;
+    font-size: 0.95rem;
+    white-space: pre-line;
+    box-shadow: inset 0 3px 8px rgba(0,0,0,0.2);
+    border: 2px solid #003a88;
+
+    /* hidden until messages appear */
+    display: none;
+}
+
+#log:not(:empty) {
+    display: block;
+    margin-top: 20px;
+}

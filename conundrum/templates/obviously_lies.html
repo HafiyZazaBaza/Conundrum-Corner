@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Obviously Lies</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Obviously Lies</h1>
+
+    <h3>Host: Set Question</h3>
+    <input id="questionInput" placeholder="Question">
+    <input id="correctInput" placeholder="Correct Answer">
+    <button onclick="setQuestion()">Set</button>
+
+    <h3>Submit Fake Answer</h3>
+    <input id="fakeInput" placeholder="Your fake answer">
+    <button onclick="submitFake()">Submit</button>
+
+    <h3>Voting</h3>
+    <div id="voteArea"></div>
+
+    <div id="results"></div>
+
+    <script>
+        const socket = io();
+        const room = "lies_room";
+
+        function setQuestion() {
+            const question = document.getElementById("questionInput").value;
+            const correct_answer = document.getElementById("correctInput").value;
+            socket.emit("lies_set_question", { room, question, correct_answer });
+        }
+
+        function submitFake() {
+            const answer = document.getElementById("fakeInput").value;
+            socket.emit("lies_submit_fake", { room, answer });
+        }
+
+        function startVoting() {
+            socket.emit("lies_start_voting", { room });
+        }
+
+        function castVote(answer) {
+            socket.emit("lies_cast_vote", { room, chosen_answer: answer });
+        }
+
+        function endRound() {
+            socket.emit("lies_end_round", { room });
+        }
+
+        // Listen
+        socket.on("lies_new_question", data => {
+            log(`New Question: ${data.question} (hosted by ${data.host})`);
+        });
+
+        socket.on("lies_start_voting", data => {
+            let html = "<h3>Vote for the right answer:</h3>";
+            data.options.forEach(opt => {
+                html += `<button onclick="castVote('${opt}')">${opt}</button><br>`;
+            });
+            document.getElementById("voteArea").innerHTML = html;
+        });
+
+        socket.on("lies_round_result", data => {
+            document.getElementById("results").innerText =
+                `Correct: ${data.correct_answer}, Scores: ${JSON.stringify(data.scores)}`;
+        });
+
+        function log(msg) {
+            document.getElementById("results").innerHTML += "<p>" + msg + "</p>";
+        }
+    </script>
+</body>
+</html>
