@@ -23,8 +23,12 @@
                     <label for="username">Enter username:</label>
                     <input type="text" name="username" placeholder="Your name" required>
 
-                    <label for="max_players">Number of players:</label>
-                    <input type="number" name="max_players" placeholder="Enter number of players" required>
+                    <label for="numPlayers">Number of players:</label>
+                    <select id="numPlayers" name="max_players" required>
+                        {% for i in range(1, 11) %}
+                            <option value="{{ i }}">{{ i }}</option>
+                        {% endfor %}
+                    </select>
 
                     <label for="game_mode">Select game mode:</label>
                     <select name="game_mode" required>
