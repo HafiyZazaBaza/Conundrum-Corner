@@ -1,72 +1,111 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Conundrum Lobby</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CONUNDRUM LOBBY</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
-        #chat-box { border: 1px solid #ccc; padding: 10px; background: white; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
-        #user-list { border: 1px solid #ccc; padding: 10px; background: #fff; margin-bottom: 10px; }
-        input[type=text] { width: 80%; padding: 8px; }
-        button { padding: 8px; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        #chat-box {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        #user-list {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        #waiting-msg {
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+        input[type=text] {
+            width: 80%;
+            padding: 8px;
+        }
+        button {
+            padding: 8px;
+        }
     </style>
 </head>
 <body>
-    <h1>Lobby</h1>
+    <h1>CONUNDRUM LOBBY</h1>
 
     <div id="user-list">
         <strong>Connected Users:</strong>
         <ul id="users"></ul>
     </div>
 
+    <div id="waiting-msg">Waiting for the host to start the game...</div>
+
     <div id="chat-box"></div>
 
     <form id="chat-form">
-        <input type="text" id="message" placeholder="Type a message..." autocomplete="off" />
+        <input type="text" id="message" placeholder="Type a message..." autocomplete="off">
         <button type="submit">Send</button>
     </form>
 
     <script>
         const socket = io();
 
-        // When connected, join lobby
-        socket.on("connect", () => {
-            socket.emit("join", {});
-        });
+        // ------------------ URL Parameters ------------------
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get("username");
+        const lobbyCode = urlParams.get("lobby");
+        const gameMode = urlParams.get("mode");
 
-        // Update user list
-        socket.on("user_list", (users) => {
+        // ------------------ Join Lobby ------------------
+        socket.emit("join_lobby", { username, lobbyCode });
+
+        // ------------------ Update User List ------------------
+        socket.on("lobby_update", data => {
             const userList = document.getElementById("users");
             userList.innerHTML = "";
-            users.forEach(user => {
+            const host = data.host;
+            data.players.forEach(user => {
                 const li = document.createElement("li");
-                li.textContent = user;
+                li.textContent = user === host ? `${user} (Host)` : user;
                 userList.appendChild(li);
             });
         });
 
-        // Display chat messages
-        socket.on("receive_message", (data) => {
+        // ------------------ Receive Chat Messages ------------------
+        socket.on("receive_message", data => {
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML += `<p><strong>${data.username}:</strong> ${data.message}</p>`;
-            chatBox.scrollTop = chatBox.scrollHeight; // auto scroll
+            chatBox.scrollTop = chatBox.scrollHeight;
         });
 
-        // Display system messages (join/leave)
-        socket.on("message", (msg) => {
+        socket.on("message", msg => {
             const chatBox = document.getElementById("chat-box");
             chatBox.innerHTML += `<p><em>${msg}</em></p>`;
             chatBox.scrollTop = chatBox.scrollHeight;
         });
 
-        // Send chat messages
-        document.getElementById("chat-form").addEventListener("submit", (e) => {
+        // ------------------ Send Chat Messages ------------------
+        document.getElementById("chat-form").addEventListener("submit", e => {
             e.preventDefault();
             const msgInput = document.getElementById("message");
             if (msgInput.value.trim() !== "") {
                 socket.emit("send_message", { message: msgInput.value });
                 msgInput.value = "";
             }
+        });
+
+        // ------------------ Error Handling ------------------
+        socket.on("error_message", data => {
+            alert(data.message);
         });
     </script>
 </body>
