@@ -24,7 +24,6 @@ def handle_create_lobby(data):
 
     game_mode = data.get("gameMode")
 
-    # Validation
     if not username or not game_mode:
         emit("error_message", {"message": "Invalid data. Username and game mode are required."})
         return
@@ -55,18 +54,12 @@ def handle_create_lobby(data):
         "maxPlayers": max_players,
     })
 
-    # Update all players in this room
-    emit("lobby_update", {
-        "host": username,
-        "players": lobbies[lobby_code]["players"]
-    }, room=lobby_code)
 
 @socketio.on("join_lobby")
 def handle_join_lobby(data):
     username = data.get("username")
     lobby_code = data.get("lobbyCode")
 
-    # Validation
     if not username or not lobby_code:
         emit("error_message", {"message": "Invalid join request."})
         return
@@ -79,19 +72,17 @@ def handle_join_lobby(data):
         emit("error_message", {"message": "Lobby is full."})
         return
 
-    # Add player
     lobby["players"].append(username)
     join_room(lobby_code)
 
-    # Notify joining player
     emit("lobby_joined", {
         "lobbyCode": lobby_code,
         "username": username,
         "gameMode": lobby["game_mode"],
         "players": lobby["players"],
-    })
+    }, room=request.sid)
 
-    # Notify all players with updated list
+    # Notify everyone in the room about the update
     emit("lobby_update", {
         "host": lobby["host"],
         "players": lobby["players"]

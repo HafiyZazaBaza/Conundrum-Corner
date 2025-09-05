@@ -1,10 +1,15 @@
-from flask import Flask, session, redirect, url_for, render_template, request
+# conundrum/__init__.py
+from flask import Flask, render_template
 from flask_socketio import SocketIO
 
 socketio = SocketIO()  # global SocketIO object
 
 def create_app():
-    app = Flask(__name__, template_folder="network/templates", static_folder="network/static")
+    app = Flask(
+        __name__,
+        template_folder="templates",  # ✅ FIXED
+        static_folder="static"        # ✅ FIXED
+    )
     app.config['SECRET_KEY'] = "super-secret-key"
 
     # Register blueprints

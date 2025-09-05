@@ -1,6 +1,8 @@
+# conundrum/games/routes.py
 from flask import Blueprint, render_template, session, redirect, url_for, request
 from .. import socketio
-from flask_socketio import join_room, emit
+from flask_socketio import join_room, leave_room, emit
+from uuid import uuid4
 
 # Import game classes
 from .reverse_guessing import ReverseGuessingGame
@@ -10,22 +12,24 @@ from .obviously_lies import ObviouslyLiesGame
 
 games_bp = Blueprint("games", __name__, url_prefix="/games")
 
-# Create game instances
+# Game instances
 reverse_game = ReverseGuessingGame()
 bad_advice_game = BadAdviceGame()
 emoji_game = EmojiTranslationGame()
 lies_game = ObviouslyLiesGame()
 
-# Track connected players ( sid: username )
+# Track connected players: { sid: {"username": ..., "room": ...} }
 players = {}
 
+# Track lobbies: { lobby_code: {"host": ..., "players": []} }
+lobbies = {}
+
 # --------------------------
-# Lobby Route
+# Home & Lobby Routes
 # --------------------------
 
 @games_bp.route("/lobby")
 def lobby():
-    # Accept username, lobby_code, game_mode from query parameters
     username = request.args.get("username")
     lobby_code = request.args.get("lobby")
     game_mode = request.args.get("mode")
@@ -33,8 +37,9 @@ def lobby():
     if not username or not lobby_code or not game_mode:
         return redirect(url_for("home"))
 
-    # Store username in session for later use in socket events
     session["username"] = username
+    session["lobby"] = lobby_code
+    session["mode"] = game_mode
 
     return render_template(
         "lobby.html",
@@ -44,130 +49,48 @@ def lobby():
     )
 
 # --------------------------
-# Lobby Events
+# Socket Events: Lobby
 # --------------------------
 
-@socketio.on("join_room")
-def handle_join(data):
-    username = session.get("username")
-    room = data.get("room")
-    if username and room:
-        players[session.sid] = username
-        join_room(room)
-        emit("user_joined", {"username": username}, room=room)
+@socketio.on("create_lobby")
+def handle_create_lobby(data):
+    username = data.get("username")
+    game_mode = data.get("gameMode")
+    max_players = int(data.get("maxPlayers", 8))
 
+    lobby_code = str(uuid4())[:4].upper()  # 4-char lobby code
+    lobbies[lobby_code] = {"host": username, "players": [username], "mode": game_mode, "max": max_players}
+
+    emit("lobby_created", {"username": username, "lobbyCode": lobby_code, "gameMode": game_mode}, room=request.sid)
+
+@socketio.on("join_lobby")
+def handle_join_lobby(data):
+    username = data.get("username")
+    lobby_code = data.get("lobbyCode")
+
+    if lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found"}, room=request.sid)
+        return
+
+    if len(lobbies[lobby_code]["players"]) >= lobbies[lobby_code]["max"]:
+        emit("error_message", {"message": "Lobby is full"}, room=request.sid)
+        return
+
+    lobbies[lobby_code]["players"].append(username)
+    join_room(lobby_code)
+
+    # Notify joining player
+    emit("lobby_joined", {"username": username, "lobbyCode": lobby_code, "gameMode": lobbies[lobby_code]["mode"]}, room=request.sid)
+
+    # Update everyone in lobby
+    emit("user_list", lobbies[lobby_code]["players"], room=lobby_code)
+
+# Chat system
 @socketio.on("send_message")
 def handle_message(data):
+    room = session.get("lobby")
     username = session.get("username")
-    room = data.get("room")
     message = data.get("message")
-    if username and room and message:
+
+    if room and username and message:
         emit("receive_message", {"username": username, "message": message}, room=room)
-
-# --------------------------
-# Reverse Guessing Game
-# --------------------------
-
-@socketio.on("reverse_start_round")
-def reverse_start_round(data):
-    room = data.get("room")
-    reverse_game.start_round(socketio, room, players)
-
-@socketio.on("reverse_submit_question")
-def reverse_submit_question(data):
-    sid = session.sid
-    username = session.get("username")
-    room = data.get("room")
-    question = data.get("question")
-    reverse_game.submit_question(socketio, room, sid, username, question)
-
-@socketio.on("reverse_guess_answer")
-def reverse_guess_answer(data):
-    username = session.get("username")
-    room = data.get("room")
-    guess = data.get("guess")
-    reverse_game.guess_answer(socketio, room, username, guess, players)
-
-# --------------------------
-# Bad Advice Hotline
-# --------------------------
-
-@socketio.on("badadvice_start_round")
-def badadvice_start_round(data):
-    room = data.get("room")
-    bad_advice_game.start_round(socketio, room, players)
-
-@socketio.on("badadvice_submit_answer")
-def badadvice_submit_answer(data):
-    sid = session.sid
-    room = data.get("room")
-    answer = data.get("answer")
-    bad_advice_game.submit_answer(socketio, room, sid, answer)
-
-@socketio.on("badadvice_cast_vote")
-def badadvice_cast_vote(data):
-    sid = session.sid
-    room = data.get("room")
-    voted_sid = data.get("voted_sid")
-    bad_advice_game.cast_vote(socketio, room, sid, voted_sid, players)
-
-# --------------------------
-# Emoji Translation
-# --------------------------
-
-@socketio.on("emoji_start_round")
-def emoji_start_round(data):
-    room = data.get("room")
-    emoji_game.start_round(socketio, room, players)
-
-@socketio.on("emoji_submit_translation")
-def emoji_submit_translation(data):
-    sid = session.sid
-    room = data.get("room")
-    emoji_string = data.get("emoji")
-    emoji_game.submit_translation(socketio, room, sid, emoji_string)
-
-@socketio.on("emoji_submit_guess")
-def emoji_submit_guess(data):
-    sid = session.sid
-    room = data.get("room")
-    guess = data.get("guess")
-    username = session.get("username")
-    emoji_game.submit_guess(socketio, room, sid, guess, username)
-
-# --------------------------
-# Obviously Lies
-# --------------------------
-
-@socketio.on("lies_set_question")
-def lies_set_question(data):
-    room = data.get("room")
-    question = data.get("question")
-    correct_answer = data.get("correct_answer")
-    host = session.get("username")
-    lies_game.set_question(socketio, room, question, correct_answer, host)
-
-@socketio.on("lies_submit_fake")
-def lies_submit_fake(data):
-    sid = session.sid
-    room = data.get("room")
-    fake_answer = data.get("answer")
-    lies_game.submit_fake_answer(socketio, room, sid, fake_answer)
-
-@socketio.on("lies_start_voting")
-def lies_start_voting(data):
-    room = data.get("room")
-    lies_game.start_voting(socketio, room)
-
-@socketio.on("lies_cast_vote")
-def lies_cast_vote(data):
-    sid = session.sid
-    room = data.get("room")
-    chosen_answer = data.get("chosen_answer")
-    username = session.get("username")
-    lies_game.cast_vote(socketio, room, sid, chosen_answer, username)
-
-@socketio.on("lies_end_round")
-def lies_end_round(data):
-    room = data.get("room")
-    lies_game.end_round(socketio, room)

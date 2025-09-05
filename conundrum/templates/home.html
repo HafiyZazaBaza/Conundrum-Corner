@@ -5,128 +5,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CONUNDRUM CORNER</title>
+    <title>Conundrum Corner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script> <!-- latest socket.IO client -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>CONUNDRUM CORNER</h1>
+        <h1>🎮 CONUNDRUM CORNER</h1>
 
-        <!-- wrapper for forms -->
         <div class="forms-wrapper">
-
-            <!-- create lobby form -->
+            <!-- Create Lobby -->
             <div class="form-box">
-                <h2>CREATE LOBBY</h2>
+                <h2>Create Lobby</h2>
                 <form id="createLobbyForm">
-                    <label for="username">Enter username:</label>
                     <input type="text" name="username" placeholder="Your name" required>
-
-                    <label for="numPlayers">Number of players:</label>
-                    <select id="numPlayers" name="max_players" required>
-                        {% for i in range(1, 11) %}
-                            <option value="{{ i }}">{{ i }}</option>
-                        {% endfor %}
-                    </select>
-
-                    <label for="game_mode">Select game mode:</label>
+                    <input type="number" name="max_players" placeholder="Players (2-10)" min="2" max="10" value="4">
                     <select name="game_mode" required>
                         <option value="reverse_guessing">Reverse Guessing</option>
                         <option value="emoji_translation">Emoji Translation</option>
                         <option value="bad_advice_hotline">Bad Advice Hotline</option>
                         <option value="obviously_lies">Obviously Lies</option>
                     </select>
-
-                    <button type="submit">Create Lobby</button>
+                    <button type="submit">Create</button>
                 </form>
             </div>
 
-            <!-- join lobby form -->
+            <!-- Join Lobby -->
             <div class="form-box">
-                <h2>JOIN LOBBY</h2>
+                <h2>Join Lobby</h2>
                 <form id="joinLobbyForm">
-                    <label for="username">Enter Username:</label>
                     <input type="text" name="username" placeholder="Your name" required>
-
-                    <label for="lobby_code">Enter Lobby Code:</label>
-                    <input type="text" name="lobby_code" placeholder="e.g. 1234" required>
-
-                    <button type="submit">Join Lobby</button>
+                    <input type="text" name="lobby_code" placeholder="Lobby Code" maxlength="4" required>
+                    <button type="submit">Join</button>
                 </form>
             </div>
-
-        </div> <!-- end forms-wrapper (to make both boxes sit side by side) -->
-
-        <div id="log"></div>
+        </div>
     </div>
 
     <script>
         const socket = io();
 
-        // ------------------ create lobby ------------------
-        document.getElementById("createLobbyForm").addEventListener("submit", function(e) {
+        // Create Lobby
+        document.getElementById("createLobbyForm").addEventListener("submit", e => {
             e.preventDefault();
-            const username = this.username.value;
-            const maxPlayers = this.max_players.value;
-            const gameMode = this.game_mode.value;
-
+            const username = e.target.username.value;
+            const maxPlayers = e.target.max_players.value;
+            const gameMode = e.target.game_mode.value;
             socket.emit("create_lobby", { username, maxPlayers, gameMode });
         });
 
-        // ------------------ join lobby ------------------
-        document.getElementById("joinLobbyForm").addEventListener("submit", function(e) {
+        // Join Lobby
+        document.getElementById("joinLobbyForm").addEventListener("submit", e => {
             e.preventDefault();
-            const username = this.username.value;
-            const lobbyCode = this.lobby_code.value;
-
+            const username = e.target.username.value;
+            const lobbyCode = e.target.lobby_code.value.toUpperCase();
             socket.emit("join_lobby", { username, lobbyCode });
         });
 
-        // ------------------ server responses ------------------
+        // ✅ Redirects
         socket.on("lobby_created", data => {
-            log(`✅ Lobby created! Code: ${data.lobbyCode}, Mode: ${data.gameMode}, Host: ${data.username}`);
-            redirectToGame(data.gameMode, data.lobbyCode, data.username);
+            window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}&mode=${encodeURIComponent(data.gameMode)}`;
         });
 
         socket.on("lobby_joined", data => {
-            log(`👤 ${data.username} joined lobby: ${data.lobbyCode}`);
-            redirectToGame(data.gameMode, data.lobbyCode, data.username);
+            window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}&mode=${encodeURIComponent(data.gameMode)}`;
         });
 
+        // ❌ Error
         socket.on("error_message", data => {
-            log(`❌ Error: ${data.message}`);
+            alert(`❌ ${data.message}`);
         });
-
-        // ------------------ redirect to game page ------------------
-        function redirectToGame(gameMode, lobbyCode, username) {
-            let gamePage = "";
-            switch (gameMode) {
-                case "reverse_guessing":
-                    gamePage = "reverse_guessing.html";
-                    break;
-                case "emoji_translation":
-                    gamePage = "emoji_translation.html";
-                    break;
-                case "bad_advice_hotline":
-                    gamePage = "bad_advice_hotline.html";
-                    break;
-                case "obviously_lies":
-                    gamePage = "obviously_lies.html";
-                    break;
-                default:
-                    return;
-            }
-
-            // attach query params so the game page knows who you are
-            window.location.href = `${gamePage}?username=${encodeURIComponent(username)}&lobby=${encodeURIComponent(lobbyCode)}`;
-        }
-
-        // ------------------ logging ------------------
-        function log(msg) {
-            const logDiv = document.getElementById("log");
-            logDiv.innerText += msg + "\n";
-        }
     </script>
 </body>
 </html>
