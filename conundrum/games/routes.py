@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, redirect, url_for
+from flask import Blueprint, render_template, session, redirect, url_for, request
 from .. import socketio
 from flask_socketio import join_room, emit
 
@@ -10,7 +10,7 @@ from .obviously_lies import ObviouslyLiesGame
 
 games_bp = Blueprint("games", __name__, url_prefix="/games")
 
-# Create game 
+# Create game instances
 reverse_game = ReverseGuessingGame()
 bad_advice_game = BadAdviceGame()
 emoji_game = EmojiTranslationGame()
@@ -25,10 +25,23 @@ players = {}
 
 @games_bp.route("/lobby")
 def lobby():
-    username = session.get("username")
-    if not username:
+    # Accept username, lobby_code, game_mode from query parameters
+    username = request.args.get("username")
+    lobby_code = request.args.get("lobby")
+    game_mode = request.args.get("mode")
+
+    if not username or not lobby_code or not game_mode:
         return redirect(url_for("home"))
-    return render_template("lobby.html", username=username)
+
+    # Store username in session for later use in socket events
+    session["username"] = username
+
+    return render_template(
+        "lobby.html",
+        username=username,
+        lobby_code=lobby_code,
+        game_mode=game_mode
+    )
 
 # --------------------------
 # Lobby Events

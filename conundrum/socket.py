@@ -1,5 +1,6 @@
 # conundrum/socket.py
 from flask_socketio import emit, join_room
+from flask import request
 from . import socketio
 import random
 import string
@@ -45,12 +46,20 @@ def handle_create_lobby(data):
     }
 
     join_room(lobby_code)
+
+    # Send confirmation to creator
     emit("lobby_created", {
         "lobbyCode": lobby_code,
         "username": username,
         "gameMode": game_mode,
         "maxPlayers": max_players,
     })
+
+    # Update all players in this room
+    emit("lobby_update", {
+        "host": username,
+        "players": lobbies[lobby_code]["players"]
+    }, room=lobby_code)
 
 @socketio.on("join_lobby")
 def handle_join_lobby(data):
@@ -74,9 +83,16 @@ def handle_join_lobby(data):
     lobby["players"].append(username)
     join_room(lobby_code)
 
+    # Notify joining player
     emit("lobby_joined", {
         "lobbyCode": lobby_code,
         "username": username,
         "gameMode": lobby["game_mode"],
         "players": lobby["players"],
+    })
+
+    # Notify all players with updated list
+    emit("lobby_update", {
+        "host": lobby["host"],
+        "players": lobby["players"]
     }, room=lobby_code)

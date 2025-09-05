@@ -56,7 +56,6 @@
         const socket = io();
         const logDiv = document.getElementById("log");
 
-        // Helper function to log messages
         function log(msg) {
             console.log(msg);
             logDiv.innerText += msg + "\n";
@@ -99,9 +98,9 @@
             alert(data.message);
         });
 
-        // ------------------ Redirect to Lobby ------------------
+        // ------------------ Redirect ------------------
         function redirectToLobby(lobbyCode, username, gameMode) {
-            const url = `lobby.html?username=${encodeURIComponent(username)}&lobby=${encodeURIComponent(lobbyCode)}&mode=${encodeURIComponent(gameMode)}`;
+            const url = `/games/lobby?username=${encodeURIComponent(username)}&lobby=${encodeURIComponent(lobbyCode)}&mode=${encodeURIComponent(gameMode)}`;
             log(`Redirecting to ${url}`);
             window.location.href = url;
         }
