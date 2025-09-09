@@ -1,8 +1,6 @@
 # conundrum/games/routes.py
 from flask import Blueprint, render_template, session, redirect, url_for, request
-from .. import socketio
-from flask_socketio import join_room, leave_room, emit
-from uuid import uuid4
+from .. import socket as socket_module  # central lobbies live in socket.py
 
 # Import game classes
 from .reverse_guessing import ReverseGuessingGame
@@ -12,24 +10,20 @@ from .obviously_lies import ObviouslyLiesGame
 
 games_bp = Blueprint("games", __name__, url_prefix="/games")
 
-# Game instances
+# --------------------------
+# Game Instances (can be linked to lobbies later)
+# --------------------------
 reverse_game = ReverseGuessingGame()
 bad_advice_game = BadAdviceGame()
 emoji_game = EmojiTranslationGame()
 lies_game = ObviouslyLiesGame()
 
-# Track connected players: { sid: {"username": ..., "room": ...} }
-players = {}
-
-# Track lobbies: { lobby_code: {"host": ..., "players": []} }
-lobbies = {}
-
 # --------------------------
-# Home & Lobby Routes
+# Lobby Route
 # --------------------------
-
 @games_bp.route("/lobby")
 def lobby():
+    """Render the lobby page with user + lobby info."""
     username = request.args.get("username")
     lobby_code = request.args.get("lobby")
     game_mode = request.args.get("mode")
@@ -41,56 +35,48 @@ def lobby():
     session["lobby"] = lobby_code
     session["mode"] = game_mode
 
+    # Check if this user is the host
+    is_host = False
+    if lobby_code in socket_module.lobbies:
+        if socket_module.lobbies[lobby_code].get("host") == username:
+            is_host = True
+
     return render_template(
         "lobby.html",
         username=username,
         lobby_code=lobby_code,
-        game_mode=game_mode
+        game_mode=game_mode,
+        is_host=is_host
     )
 
 # --------------------------
-# Socket Events: Lobby
+# Play Route
 # --------------------------
+@games_bp.route("/play")
+def play():
+    """Render the correct game page depending on mode."""
+    username = request.args.get("username")
+    lobby_code = request.args.get("lobby")
+    game_mode = request.args.get("mode")
 
-@socketio.on("create_lobby")
-def handle_create_lobby(data):
-    username = data.get("username")
-    game_mode = data.get("gameMode")
-    max_players = int(data.get("maxPlayers", 8))
+    if not username or not lobby_code or not game_mode:
+        return redirect(url_for("home"))
 
-    lobby_code = str(uuid4())[:4].upper()  # 4-char lobby code
-    lobbies[lobby_code] = {"host": username, "players": [username], "mode": game_mode, "max": max_players}
+    # Save session info
+    session["username"] = username
+    session["lobby"] = lobby_code
+    session["mode"] = game_mode
 
-    emit("lobby_created", {"username": username, "lobbyCode": lobby_code, "gameMode": game_mode}, room=request.sid)
+    # Whitelist valid modes → maps directly to template files
+    valid_modes = {
+        "reverse_guessing": "reverse_guessing.html",
+        "bad_advice_hotline": "bad_advice_hotline.html",
+        "emoji_translation": "emoji_translation.html",
+        "obviously_lies": "obviously_lies.html",
+    }
 
-@socketio.on("join_lobby")
-def handle_join_lobby(data):
-    username = data.get("username")
-    lobby_code = data.get("lobbyCode")
-
-    if lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found"}, room=request.sid)
-        return
-
-    if len(lobbies[lobby_code]["players"]) >= lobbies[lobby_code]["max"]:
-        emit("error_message", {"message": "Lobby is full"}, room=request.sid)
-        return
-
-    lobbies[lobby_code]["players"].append(username)
-    join_room(lobby_code)
-
-    # Notify joining player
-    emit("lobby_joined", {"username": username, "lobbyCode": lobby_code, "gameMode": lobbies[lobby_code]["mode"]}, room=request.sid)
-
-    # Update everyone in lobby
-    emit("user_list", lobbies[lobby_code]["players"], room=lobby_code)
-
-# Chat system
-@socketio.on("send_message")
-def handle_message(data):
-    room = session.get("lobby")
-    username = session.get("username")
-    message = data.get("message")
-
-    if room and username and message:
-        emit("receive_message", {"username": username, "message": message}, room=room)
+    if game_mode in valid_modes:
+        return render_template(valid_modes[game_mode], username=username, lobby_code=lobby_code)
+    else:
+        # fallback → back to lobby
+        return redirect(url_for("games.lobby", username=username, lobby=lobby_code, mode=game_mode))
