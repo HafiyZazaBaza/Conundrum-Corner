@@ -1,67 +1,122 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lobby - {{ lobby_code }}</title>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; background: #fafafa; margin: 20px; }
-        #chat-box { border: 1px solid #ccc; padding: 10px; background: white; height: 250px; overflow-y: auto; margin-bottom: 10px; }
-        #user-list { border: 1px solid #ccc; padding: 10px; background: white; margin-bottom: 10px; }
-        input[type=text] { width: 70%; padding: 8px; }
-        button { padding: 8px; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lobby - {{ lobby_code }}</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #fafafa; margin: 20px; }
+    #chat-box { border: 1px solid #ccc; padding: 10px; background: white; height: 350px; overflow-y: auto; margin-bottom: 10px;}
+    #user-list { border: 1px solid #ccc; padding: 10px; background: white; margin-bottom: 10px; }
+    input[type=text] { width: 75%; padding: 8px; box-sizing: border-box; }
+    button { padding: 8px; }
+    #top-row { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+    #lobby-code { font-weight:700; font-size:1.1rem; }
+    .host-badge { color: white; background: #3b82f6; padding: 2px 6px; border-radius:6px; margin-left:8px; font-size:0.85rem; }
+  </style>
 </head>
 <body>
-    <h1>🎲 Lobby: {{ lobby_code }}</h1>
-    <p>Game Mode: <strong>{{ game_mode }}</strong></p>
-    <p>You are: <strong>{{ username }}</strong></p>
-
-    <div id="user-list">
-        <strong>Players:</strong>
-        <ul id="users"></ul>
+  <div id="top-row">
+    <h1>🎲 Lobby: <span id="lobby-code">{{ lobby_code }}</span></h1>
+    <button id="copy-btn">Copy Code</button>
+    <div style="margin-left:auto">
+      <span>Game Mode: <strong>{{ game_mode }}</strong></span>
     </div>
+  </div>
 
-    <div id="chat-box"></div>
+  <p>You are: <strong id="you">{{ username }}</strong>{% if is_host %} <span class="host-badge">host</span>{% endif %}</p>
 
-    <form id="chat-form">
-        <input type="text" id="message" placeholder="Type message..." autocomplete="off" />
-        <button type="submit">Send</button>
-    </form>
+  <div id="user-list">
+    <strong>Players:</strong>
+    <ul id="users" style="margin-top:8px; padding-left:18px;"></ul>
+  </div>
 
-    <script>
-        const socket = io();
-        const username = "{{ username }}";
-        const lobbyCode = "{{ lobby_code }}";
+  {% if is_host %}
+    <div style="margin-bottom:10px;">
+      <button id="start-btn">Start Game</button>
+    </div>
+  {% endif %}
 
-        // Refresh player list
-        socket.on("user_list", users => {
-            const userList = document.getElementById("users");
-            userList.innerHTML = "";
-            users.forEach(user => {
-                const li = document.createElement("li");
-                li.textContent = user;
-                userList.appendChild(li);
-            });
-        });
+  <div id="chat-box"></div>
 
-        // Display chat
-        socket.on("receive_message", data => {
-            const chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML += `<p><b>${data.username}:</b> ${data.message}</p>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
-        });
+  <form id="chat-form" style="display:flex; gap:8px;">
+    <input type="text" id="message" placeholder="Type message..." autocomplete="off" />
+    <button type="submit">Send</button>
+  </form>
 
-        // Send message
-        document.getElementById("chat-form").addEventListener("submit", e => {
-            e.preventDefault();
-            const msgInput = document.getElementById("message");
-            if (msgInput.value.trim() !== "") {
-                socket.emit("send_message", { message: msgInput.value });
-                msgInput.value = "";
-            }
-        });
-    </script>
+<script>
+  const socket = io();
+  const username = "{{ username|e }}";
+  const lobbyCode = "{{ lobby_code|e }}";
+  const gameMode = "{{ game_mode|e }}";
+
+  // Join lobby
+  socket.emit("join_lobby", { username, lobbyCode });
+
+  // Update players
+  socket.on("lobby_update", data => {
+    const usersEl = document.getElementById("users");
+    usersEl.innerHTML = "";
+    (data.players || []).forEach(u => {
+      const li = document.createElement("li");
+      li.textContent = u;
+      if (u === data.host) {
+        const span = document.createElement("span");
+        span.className = "host-badge";
+        span.textContent = "host";
+        li.appendChild(span);
+      }
+      usersEl.appendChild(li);
+    });
+  });
+
+  // Chat
+  socket.on("receive_message", data => {
+    const chatBox = document.getElementById("chat-box");
+    const p = document.createElement("p");
+    p.innerHTML = `<b>${data.username}:</b> ${data.message}`;
+    chatBox.appendChild(p);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+
+  // Error
+  socket.on("error_message", data => alert(data.message || "Error"));
+
+  // Redirect to game
+  socket.on("game_started", data => {
+    const target = `/games/play?lobby=${encodeURIComponent(lobbyCode)}&username=${encodeURIComponent(username)}&mode=${encodeURIComponent(data.mode || gameMode)}`;
+    window.location.href = target;
+  });
+
+  // Send message
+  document.getElementById("chat-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const input = document.getElementById("message");
+    const msg = input.value.trim();
+    if (!msg) return;
+    socket.emit("send_message", { lobbyCode, username, message: msg });
+    input.value = "";
+  });
+
+  // Start game
+  const startBtn = document.getElementById("start-btn");
+  if (startBtn) {
+    startBtn.addEventListener("click", () => {
+      startBtn.disabled = true;
+      socket.emit("start_game", { lobbyCode, username, mode: gameMode });
+    });
+  }
+
+  // Copy code
+  document.getElementById("copy-btn").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(lobbyCode);
+    document.getElementById("copy-btn").textContent = "Copied!";
+    setTimeout(() => document.getElementById("copy-btn").textContent = "Copy Code", 1200);
+  });
+
+  // Reconnect
+  socket.on("connect", () => socket.emit("join_lobby", { username, lobbyCode }));
+</script>
 </body>
 </html>

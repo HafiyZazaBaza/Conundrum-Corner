@@ -2,41 +2,30 @@
 from flask_socketio import emit, join_room
 from flask import request
 from . import socketio
-import random
-import string
+import random, string
 
-# In-memory lobby store
 lobbies = {}
 
-# Utility function: generate random lobby codes
 def generate_lobby_code():
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-
-# ----------------- SOCKET EVENTS -----------------
 
 @socketio.on("create_lobby")
 def handle_create_lobby(data):
     username = data.get("username")
-    try:
-        max_players = int(data.get("maxPlayers"))
-    except (ValueError, TypeError):
-        max_players = 4  # fallback default
-
     game_mode = data.get("gameMode")
+    try:
+        max_players = int(data.get("maxPlayers", 8))
+    except (ValueError, TypeError):
+        max_players = 8
 
     if not username or not game_mode:
-        emit("error_message", {"message": "Invalid data. Username and game mode are required."})
-        return
-    if max_players < 1 or max_players > 10:
-        emit("error_message", {"message": "Max players must be between 1 and 10."})
+        emit("error_message", {"message": "Username and game mode required."}, room=request.sid)
         return
 
-    # Generate unique lobby code
     lobby_code = generate_lobby_code()
     while lobby_code in lobbies:
         lobby_code = generate_lobby_code()
 
-    # Save lobby info
     lobbies[lobby_code] = {
         "host": username,
         "players": [username],
@@ -46,44 +35,73 @@ def handle_create_lobby(data):
 
     join_room(lobby_code)
 
-    # Send confirmation to creator
     emit("lobby_created", {
         "lobbyCode": lobby_code,
         "username": username,
         "gameMode": game_mode,
         "maxPlayers": max_players,
-    })
+    }, room=request.sid)
 
+    emit("lobby_update", {
+        "host": username,
+        "players": lobbies[lobby_code]["players"]
+    }, room=lobby_code)
 
 @socketio.on("join_lobby")
 def handle_join_lobby(data):
     username = data.get("username")
     lobby_code = data.get("lobbyCode")
 
-    if not username or not lobby_code:
-        emit("error_message", {"message": "Invalid join request."})
-        return
-    if lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found."})
+    if not username or not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Invalid join request."}, room=request.sid)
         return
 
     lobby = lobbies[lobby_code]
-    if len(lobby["players"]) >= lobby["max_players"]:
-        emit("error_message", {"message": "Lobby is full."})
-        return
+    if username not in lobby["players"]:
+        if len(lobby["players"]) >= lobby["max_players"]:
+            emit("error_message", {"message": "Lobby is full."}, room=request.sid)
+            return
+        lobby["players"].append(username)
 
-    lobby["players"].append(username)
     join_room(lobby_code)
 
     emit("lobby_joined", {
         "lobbyCode": lobby_code,
         "username": username,
         "gameMode": lobby["game_mode"],
-        "players": lobby["players"],
+        "players": lobby["players"]
     }, room=request.sid)
 
-    # Notify everyone in the room about the update
     emit("lobby_update", {
         "host": lobby["host"],
         "players": lobby["players"]
     }, room=lobby_code)
+
+@socketio.on("send_message")
+def handle_send_message(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+    message = data.get("message")
+
+    if not lobby_code or lobby_code not in lobbies or not message:
+        emit("error_message", {"message": "Invalid message."}, room=request.sid)
+        return
+
+    emit("receive_message", {"username": username, "message": message}, room=lobby_code)
+
+@socketio.on("start_game")
+def handle_start_game(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+    mode = data.get("mode")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start."}, room=request.sid)
+        return
+
+    emit("game_started", {"lobbyCode": lobby_code, "mode": mode or lobby["game_mode"]}, room=lobby_code)
