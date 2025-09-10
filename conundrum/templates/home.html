@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +6,20 @@
     <title>Conundrum Corner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        label {
+            display: block;
+            font-weight: bold;
+            color: black;
+            margin: 8px 0 4px;
+            text-align: left;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 12px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -18,14 +30,12 @@
             <div class="form-box">
                 <h2>Create Lobby</h2>
                 <form id="createLobbyForm">
-                    <input type="text" name="username" placeholder="Your name" required>
-                    <input type="number" name="max_players" placeholder="Players (2-10)" min="2" max="10" value="4">
-                    <select name="game_mode" required>
-                        <option value="reverse_guessing">Reverse Guessing</option>
-                        <option value="emoji_translation">Emoji Translation</option>
-                        <option value="bad_advice_hotline">Bad Advice Hotline</option>
-                        <option value="obviously_lies">Obviously Lies</option>
-                    </select>
+                    <label for="create-username">Your Name</label>
+                    <input id="create-username" type="text" name="username" placeholder="Enter your name" required>
+
+                    <label for="create-max-players">Number of Players</label>
+                    <input id="create-max-players" type="number" name="max_players" placeholder="2–10" min="2" max="10">
+
                     <button type="submit">Create</button>
                 </form>
             </div>
@@ -34,8 +44,12 @@
             <div class="form-box">
                 <h2>Join Lobby</h2>
                 <form id="joinLobbyForm">
-                    <input type="text" name="username" placeholder="Your name" required>
-                    <input type="text" name="lobby_code" placeholder="Lobby Code" maxlength="4" required>
+                    <label for="join-username">Your Name</label>
+                    <input id="join-username" type="text" name="username" placeholder="Enter your name" required>
+
+                    <label for="join-lobby-code">Lobby Code</label>
+                    <input id="join-lobby-code" type="text" name="lobby_code" placeholder="e.g. ABCD" maxlength="4" required>
+
                     <button type="submit">Join</button>
                 </form>
             </div>
@@ -49,9 +63,8 @@
         document.getElementById("createLobbyForm").addEventListener("submit", e => {
             e.preventDefault();
             const username = e.target.username.value;
-            const maxPlayers = e.target.max_players.value;
-            const gameMode = e.target.game_mode.value;
-            socket.emit("create_lobby", { username, maxPlayers, gameMode });
+            const maxPlayers = e.target.max_players.value || 2; // default to 2 if blank
+            socket.emit("create_lobby", { username, maxPlayers });
         });
 
         // Join Lobby
@@ -64,11 +77,11 @@
 
         // ✅ Redirects
         socket.on("lobby_created", data => {
-            window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}&mode=${encodeURIComponent(data.gameMode)}`;
+            window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}`;
         });
 
         socket.on("lobby_joined", data => {
-            window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}&mode=${encodeURIComponent(data.gameMode)}`;
+            window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}`;
         });
 
         // ❌ Error

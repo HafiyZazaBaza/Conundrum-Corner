@@ -1,33 +1,45 @@
+:root{
+    --bg: #074ca8;
+    --accent: #003a88;
+    --accent-dark: #002b66;
+    --card: #ececec;
+    --text-dark: #222;
+    --white: #ffffff;
+    --card-border: 2px solid var(--accent);
+}
+
 /* ---------- General Page ---------- */
 body {
     font-family: Arial, Helvetica, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #074ca8; /* main background */
-    color: #222;
+    background-color: var(--bg); /* main background */
+    color: var(--text-dark);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
 }
 
-/* ---------- Container ---------- */
+/* Shared container (used by home and lobby) */
 .container {
-    max-width: 900px;
-    margin: 50px auto;
-    padding: 20px;
-    text-align: center;
+    max-width: 1100px;
+    margin: 40px auto;
+    padding: 18px;
+    box-sizing: border-box;
 }
 
 /* ---------- Headings ---------- */
-h1 {
-    color: #ffffff;
-    font-size: 2.5rem;
-    margin-bottom: 20px;
+h1, .title {
+    color: var(--white);
+    font-size: 1.9rem;
+    margin: 0;
 }
 
 h2 {
-    color: #003a88;
+    color: var(--accent);
     margin-bottom: 15px;
 }
 
-/* ---------- Forms Wrapper (Flexbox) ---------- */
+/* ---------- Form / Home layout ---------- */
 .forms-wrapper {
     display: flex;
     justify-content: space-between;
@@ -35,30 +47,27 @@ h2 {
     margin: 20px 0;
 }
 
-/* ---------- Form Box ---------- */
 .form-box {
-    background-color: #ececec; /* form background */
+    background-color: var(--card); /* form background */
     padding: 25px;
     flex: 1; /* equal width for both boxes */
     border-radius: 15px;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.12);
     text-align: left;
-
-    /* static border */
-    border: 2px solid #003a88;
+    border: var(--card-border);
 }
 
-/* ---------- Form Labels & Inputs ---------- */
 label {
     display: block;
     margin: 10px 0 5px;
     font-weight: bold;
+    color: var(--text-dark);
 }
 
 input, select {
     width: 100%;
     padding: 10px;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
     border-radius: 8px;
     border: 1px solid #ccc;
     font-size: 1rem;
@@ -66,54 +75,241 @@ input, select {
 }
 
 input:focus, select:focus {
-    border-color: #003a88;
+    border-color: var(--accent);
     outline: none;
-    box-shadow: 0 0 6px rgba(0,58,136,0.5);
+    box-shadow: 0 0 6px rgba(0,58,136,0.18);
 }
 
-/* ---------- Buttons ---------- */
-button {
+/* Use full-width buttons inside form boxes (home create/join) */
+.form-box button {
     width: 100%;
     padding: 12px;
-    background-color: #003a88; /* button background */
-    color: #fff;
+    background-color: var(--accent); /* button background */
+    color: var(--white);
     font-size: 1rem;
     font-weight: bold;
     border: none;
     border-radius: 10px;
     cursor: pointer;
-    transition: 0.3s ease;
+    transition: 0.18s ease;
 }
 
-button:hover {
-    background-color: #002b66;
+.form-box button:hover {
+    background-color: var(--accent-dark);
     transform: translateY(-2px);
-    box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.12);
 }
 
-/* ---------- Divider ---------- */
-hr {
+/* Global button defaults (small) — lobby will use these unless inside .form-box */
+button {
+    padding: 8px 12px;
+    background-color: var(--accent);
+    color: var(--white);
     border: none;
-    border-top: 2px solid #ccc;
-    margin: 30px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.15s ease;
+    min-height: 36px;
+    min-width: 64px;
 }
 
-/* ---------- Log Section ---------- */
-#log {
-    background: #ececec;
-    padding: 15px;
-    border-radius: 12px;
-    text-align: left;
+/* small-button helper */
+.small-btn {
+    padding: 8px 12px;
     font-size: 0.95rem;
-    white-space: pre-line;
-    box-shadow: inset 0 3px 8px rgba(0,0,0,0.2);
-    border: 2px solid #003a88;
-
-    /* hidden until messages appear */
-    display: none;
+    border-radius: 8px;
 }
 
-#log:not(:empty) {
-    display: block;
-    margin-top: 20px;
+/* small hover */
+button:hover, .small-btn:hover {
+    background-color: var(--accent-dark);
+    transform: translateY(-1px);
 }
+
+/* ---------- Cards (players/chat) - shared look ---------- */
+.card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    border: var(--card-border);
+    box-sizing: border-box;
+}
+
+/* Lobby specific layout */
+.lobby-container {
+    margin-top: 24px;
+}
+
+/* Top row */
+.top-row {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:12px;
+}
+
+/* top actions align right */
+.top-actions {
+    margin-left:auto;
+}
+
+/* quick you-line */
+.you-line {
+    margin: 10px 0 14px;
+    color: var(--white);
+}
+
+/* Grid: players + chat */
+.lobby-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+/* Players card */
+.players-card .card-header,
+.chat-card .card-header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    color: var(--text-dark);
+}
+
+.players-list {
+    list-style: disc;
+    padding-left: 18px;
+    max-height: 360px;
+    overflow:auto;
+    margin: 0;
+}
+
+.player-item {
+    padding: 8px 6px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    border-radius:6px;
+}
+
+/* Host badge styles */
+.host-badge {
+    display:inline-block;
+    margin-left:10px;
+    background: var(--accent);
+    color: var(--white);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    vertical-align: middle;
+    font-weight:700;
+}
+
+.host-badge-inline {
+    display:inline-block;
+    background: rgba(255,255,255,0.12);
+    color: var(--white);
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-left: 8px;
+}
+
+/* Host control area */
+.host-controls {
+    margin-top:12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+.label-inline {
+    font-weight:700;
+    font-size:0.95rem;
+    color:var(--text-dark);
+}
+
+.select-control {
+    padding:8px;
+    border-radius:8px;
+    border:1px solid #cfcfcf;
+    font-size:0.95rem;
+}
+
+/* Small host actions container */
+.host-actions {
+    display:flex;
+    gap:8px;
+    margin-top:4px;
+}
+
+/* Waiting text for non-hosts */
+.waiting-note {
+    margin-top:12px;
+    color: #333;
+    font-style:italic;
+}
+
+/* Chat card specifics */
+.chat-card {
+    display:flex;
+    flex-direction:column;
+    height: 100%;
+}
+
+.messages {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 10px;
+    min-height: 260px;
+    max-height: 420px;
+    overflow-y: auto;
+    border: 1px solid #e3e3e3;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.03);
+}
+
+.message-line {
+    margin: 6px 0;
+    line-height: 1.25;
+    font-size: 0.96rem;
+}
+
+/* Chat form input + send */
+.chat-form {
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    align-items:center;
+}
+
+.chat-input {
+    flex:1;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-size:0.95rem;
+    box-sizing:border-box;
+}
+
+/* smaller send button */
+.chat-form .small-btn {
+    padding: 8px 12px;
+    min-width: 76px;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 850px) {
+    .lobby-grid {
+        grid-template-columns: 1fr;
+    }
+    .players-card, .chat-card {
+        width:100%;
+    }
+    .container { padding:14px; }
+    .title { font-size:1.4rem; }
+}
+

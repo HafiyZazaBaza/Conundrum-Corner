@@ -11,7 +11,7 @@ from .obviously_lies import ObviouslyLiesGame
 games_bp = Blueprint("games", __name__, url_prefix="/games")
 
 # --------------------------
-# Game Instances (can be linked to lobbies later)
+# Game Instances
 # --------------------------
 reverse_game = ReverseGuessingGame()
 bad_advice_game = BadAdviceGame()
@@ -26,20 +26,21 @@ def lobby():
     """Render the lobby page with user + lobby info."""
     username = request.args.get("username")
     lobby_code = request.args.get("lobby")
-    game_mode = request.args.get("mode")
 
-    if not username or not lobby_code or not game_mode:
+    if not username or not lobby_code:
         return redirect(url_for("home"))
 
     session["username"] = username
     session["lobby"] = lobby_code
-    session["mode"] = game_mode
 
     # Check if this user is the host
     is_host = False
+    game_mode = None
     if lobby_code in socket_module.lobbies:
-        if socket_module.lobbies[lobby_code].get("host") == username:
+        lobby = socket_module.lobbies[lobby_code]
+        if lobby.get("host") == username:
             is_host = True
+        game_mode = lobby.get("game_mode")  # may be None until host selects
 
     return render_template(
         "lobby.html",
@@ -79,4 +80,4 @@ def play():
         return render_template(valid_modes[game_mode], username=username, lobby_code=lobby_code)
     else:
         # fallback → back to lobby
-        return redirect(url_for("games.lobby", username=username, lobby=lobby_code, mode=game_mode))
+        return redirect(url_for("games.lobby", username=username, lobby=lobby_code))

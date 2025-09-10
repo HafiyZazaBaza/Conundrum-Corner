@@ -5,61 +5,81 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Lobby - {{ lobby_code }}</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; background: #fafafa; margin: 20px; }
-    #chat-box { border: 1px solid #ccc; padding: 10px; background: white; height: 350px; overflow-y: auto; margin-bottom: 10px;}
-    #user-list { border: 1px solid #ccc; padding: 10px; background: white; margin-bottom: 10px; }
-    input[type=text] { width: 75%; padding: 8px; box-sizing: border-box; }
-    button { padding: 8px; }
-    #top-row { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
-    #lobby-code { font-weight:700; font-size:1.1rem; }
-    .host-badge { color: white; background: #3b82f6; padding: 2px 6px; border-radius:6px; margin-left:8px; font-size:0.85rem; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <div id="top-row">
-    <h1>🎲 Lobby: <span id="lobby-code">{{ lobby_code }}</span></h1>
-    <button id="copy-btn">Copy Code</button>
-    <div style="margin-left:auto">
-      <span>Game Mode: <strong>{{ game_mode }}</strong></span>
-    </div>
+  <div class="lobby-container container">
+    <header class="top-row">
+      <h1 class="title">🎲 Lobby: <span id="lobby-code">{{ lobby_code }}</span></h1>
+      <div class="top-actions">
+        <button id="copy-btn" class="small-btn">Copy Code</button>
+      </div>
+    </header>
+
+    <p class="you-line">
+      You are: <strong id="you">{{ username }}</strong>
+      {% if is_host %} <span class="host-badge-inline">host</span>{% endif %}
+    </p>
+
+    <main class="lobby-grid">
+      <!-- Left: Players / Host controls -->
+      <section class="card players-card">
+        <div class="card-header">
+          <strong>Players</strong>
+          <span class="player-count" id="player-count">({{ '1' if is_host else '0' }})</span>
+        </div>
+
+        <ul id="users" class="players-list" aria-live="polite" style="margin-top:8px; padding-left:18px;"></ul>
+
+        {% if is_host %}
+        <div class="host-controls">
+          <label for="game_mode" class="label-inline">Choose game mode</label>
+          <select id="game_mode" class="select-control">
+              <option value="reverse_guessing">Reverse Guessing</option>
+              <option value="emoji_translation">Emoji Translation</option>
+              <option value="bad_advice_hotline">Bad Advice Hotline</option>
+              <option value="obviously_lies">Obviously Lies</option>
+          </select>
+
+          <div class="host-actions">
+            <button id="start-btn" class="small-btn">Start Game</button>
+          </div>
+        </div>
+        {% else %}
+          <div class="waiting-note">Waiting for host to start the game…</div>
+        {% endif %}
+      </section>
+
+      <!-- Right: Chat -->
+      <section class="card chat-card">
+        <div class="card-header"><strong>Lobby Chat</strong></div>
+
+        <div id="chat-box" class="messages" aria-live="polite" role="log"></div>
+
+        <form id="chat-form" class="chat-form" style="margin-top:12px;">
+          <input type="text" id="message" class="chat-input" placeholder="Type message..." autocomplete="off" />
+          <button type="submit" class="small-btn">Send</button>
+        </form>
+      </section>
+    </main>
   </div>
-
-  <p>You are: <strong id="you">{{ username }}</strong>{% if is_host %} <span class="host-badge">host</span>{% endif %}</p>
-
-  <div id="user-list">
-    <strong>Players:</strong>
-    <ul id="users" style="margin-top:8px; padding-left:18px;"></ul>
-  </div>
-
-  {% if is_host %}
-    <div style="margin-bottom:10px;">
-      <button id="start-btn">Start Game</button>
-    </div>
-  {% endif %}
-
-  <div id="chat-box"></div>
-
-  <form id="chat-form" style="display:flex; gap:8px;">
-    <input type="text" id="message" placeholder="Type message..." autocomplete="off" />
-    <button type="submit">Send</button>
-  </form>
 
 <script>
   const socket = io();
   const username = "{{ username|e }}";
   const lobbyCode = "{{ lobby_code|e }}";
-  const gameMode = "{{ game_mode|e }}";
 
-  // Join lobby
+  // Immediately join the lobby room on page load
   socket.emit("join_lobby", { username, lobbyCode });
 
   // Update players
   socket.on("lobby_update", data => {
     const usersEl = document.getElementById("users");
     usersEl.innerHTML = "";
-    (data.players || []).forEach(u => {
+    const players = data.players || [];
+    players.forEach(u => {
       const li = document.createElement("li");
+      li.className = "player-item";
       li.textContent = u;
       if (u === data.host) {
         const span = document.createElement("span");
@@ -69,27 +89,30 @@
       }
       usersEl.appendChild(li);
     });
+    const countEl = document.getElementById("player-count");
+    if (countEl) countEl.textContent = `(${players.length})`;
   });
 
-  // Chat
+  // Chat messages
   socket.on("receive_message", data => {
     const chatBox = document.getElementById("chat-box");
     const p = document.createElement("p");
+    p.className = "message-line";
     p.innerHTML = `<b>${data.username}:</b> ${data.message}`;
     chatBox.appendChild(p);
     chatBox.scrollTop = chatBox.scrollHeight;
   });
 
-  // Error
+  // Errors
   socket.on("error_message", data => alert(data.message || "Error"));
 
-  // Redirect to game
+  // When game starts → redirect to play (server sends mode)
   socket.on("game_started", data => {
-    const target = `/games/play?lobby=${encodeURIComponent(lobbyCode)}&username=${encodeURIComponent(username)}&mode=${encodeURIComponent(data.mode || gameMode)}`;
+    const target = `/games/play?lobby=${encodeURIComponent(lobbyCode)}&username=${encodeURIComponent(username)}&mode=${encodeURIComponent(data.mode)}`;
     window.location.href = target;
   });
 
-  // Send message
+  // Send chat
   document.getElementById("chat-form").addEventListener("submit", e => {
     e.preventDefault();
     const input = document.getElementById("message");
@@ -97,25 +120,32 @@
     if (!msg) return;
     socket.emit("send_message", { lobbyCode, username, message: msg });
     input.value = "";
+    input.focus();
   });
 
-  // Start game
+  // Start game (host only)
   const startBtn = document.getElementById("start-btn");
   if (startBtn) {
     startBtn.addEventListener("click", () => {
       startBtn.disabled = true;
-      socket.emit("start_game", { lobbyCode, username, mode: gameMode });
+      const selectedMode = document.getElementById("game_mode").value;
+      socket.emit("start_game", { lobbyCode, username, mode: selectedMode });
     });
   }
 
   // Copy code
   document.getElementById("copy-btn").addEventListener("click", async () => {
-    await navigator.clipboard.writeText(lobbyCode);
-    document.getElementById("copy-btn").textContent = "Copied!";
-    setTimeout(() => document.getElementById("copy-btn").textContent = "Copy Code", 1200);
+    try {
+      await navigator.clipboard.writeText(lobbyCode);
+      const btn = document.getElementById("copy-btn");
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = "Copy Code", 1200);
+    } catch (err) {
+      alert("Copy failed");
+    }
   });
 
-  // Reconnect
+  // Rejoin on reconnect
   socket.on("connect", () => socket.emit("join_lobby", { username, lobbyCode }));
 </script>
 </body>

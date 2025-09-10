@@ -12,14 +12,13 @@ def generate_lobby_code():
 @socketio.on("create_lobby")
 def handle_create_lobby(data):
     username = data.get("username")
-    game_mode = data.get("gameMode")
     try:
         max_players = int(data.get("maxPlayers", 8))
     except (ValueError, TypeError):
         max_players = 8
 
-    if not username or not game_mode:
-        emit("error_message", {"message": "Username and game mode required."}, room=request.sid)
+    if not username:
+        emit("error_message", {"message": "Username required."}, room=request.sid)
         return
 
     lobby_code = generate_lobby_code()
@@ -30,7 +29,7 @@ def handle_create_lobby(data):
         "host": username,
         "players": [username],
         "max_players": max_players,
-        "game_mode": game_mode,
+        "game_mode": None,  # host will choose later
     }
 
     join_room(lobby_code)
@@ -38,7 +37,6 @@ def handle_create_lobby(data):
     emit("lobby_created", {
         "lobbyCode": lobby_code,
         "username": username,
-        "gameMode": game_mode,
         "maxPlayers": max_players,
     }, room=request.sid)
 
@@ -68,7 +66,7 @@ def handle_join_lobby(data):
     emit("lobby_joined", {
         "lobbyCode": lobby_code,
         "username": username,
-        "gameMode": lobby["game_mode"],
+        "gameMode": lobby["game_mode"],  # may be None
         "players": lobby["players"]
     }, room=request.sid)
 
@@ -104,4 +102,11 @@ def handle_start_game(data):
         emit("error_message", {"message": "Only the host can start."}, room=request.sid)
         return
 
-    emit("game_started", {"lobbyCode": lobby_code, "mode": mode or lobby["game_mode"]}, room=lobby_code)
+    if not mode:
+        emit("error_message", {"message": "Game mode required to start."}, room=request.sid)
+        return
+
+    # Save the chosen game mode
+    lobby["game_mode"] = mode
+
+    emit("game_started", {"lobbyCode": lobby_code, "mode": mode}, room=lobby_code)
