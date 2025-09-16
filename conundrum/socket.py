@@ -23,15 +23,7 @@ from flask_socketio import emit, join_room, leave_room
 import random
 import string
 import traceback
-
-# try both import styles so this file works whether you run as package or not
-try:
-    from conundrum.utils.chat_handler import ChatHandler
-except Exception:
-    try:
-        from utils.chat_handler import ChatHandler
-    except Exception:
-        raise ImportError("Could not import ChatHandler. Put chat_handler.py in conundrum/utils or utils/")
+from conundrum.utils.chat_handler import ChatHandler
 
 # in-memory state (simple; not persistent)
 lobbies = {}         # { "ABCD": {"host": "Alice", "players": ["Alice","Bob"], "game_mode": "reverse_guessing", "max_players": 4} }
