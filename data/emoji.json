@@ -1,0 +1,218 @@
+{
+  "emotions": [
+    {
+      "emoji": "😊",
+      "keywords": ["smile", "happy", "joyful", "friendly", "content"]
+    },
+    {
+      "emoji": "😂",
+      "keywords": ["laughing", "tears of joy", "funny", "hilarious", "joke"]
+    },
+    {
+      "emoji": "😢",
+      "keywords": ["sad", "crying", "tear", "upset", "emotional"]
+    },
+    {
+      "emoji": "😎",
+      "keywords": ["cool", "sunglasses", "confident", "chill", "style"]
+    },
+    {
+      "emoji": "😩",
+      "keywords": ["weary", "tired", "exhausted", "overwhelmed", "stress"]
+    },
+    {
+      "emoji": "😍",
+      "keywords": ["love", "heart", "romantic", "affection", "attracted"]
+    },
+    {
+      "emoji": "😱",
+      "keywords": ["scared", "fear", "horror", "shocked", "panic"]
+    },
+    {
+      "emoji": "😤",
+      "keywords": ["angry", "frustrated", "mad", "annoyed", "rage"]
+    },
+    {
+      "emoji": "🥳",
+      "keywords": ["celebrate", "party", "happy", "excited", "joy"]
+    }
+  ],
+  "animals": [
+    {
+      "emoji": "🐶",
+      "keywords": ["dog", "puppy", "pet", "canine", "animal"]
+    },
+    {
+      "emoji": "🐱",
+      "keywords": ["cat", "kitten", "pet", "feline", "purring"]
+    },
+    {
+      "emoji": "🦁",
+      "keywords": ["lion", "wild", "animal", "brave", "king"]
+    },
+    {
+      "emoji": "🐯",
+      "keywords": ["tiger", "wild", "animal", "fierce", "powerful"]
+    },
+    {
+      "emoji": "🐰",
+      "keywords": ["rabbit", "bunny", "cute", "animal", "fluffy"]
+    },
+    {
+      "emoji": "🐼",
+      "keywords": ["panda", "bear", "cute", "black and white", "animal"]
+    },
+    {
+      "emoji": "🦊",
+      "keywords": ["fox", "animal", "wild", "sly", "cute"]
+    },
+    {
+      "emoji": "🦉",
+      "keywords": ["owl", "bird", "wise", "night", "animal"]
+    },
+    {
+      "emoji": "🐧",
+      "keywords": ["penguin", "bird", "cute", "cold", "animal"]
+    }
+  ],
+  "food": [
+    {
+      "emoji": "🍎",
+      "keywords": ["apple", "fruit", "healthy", "red", "sweet"]
+    },
+    {
+      "emoji": "🍔",
+      "keywords": ["burger", "food", "fast food", "delicious", "cheese"]
+    },
+    {
+      "emoji": "🍕",
+      "keywords": ["pizza", "food", "cheese", "slice", "delicious"]
+    },
+    {
+      "emoji": "🍩",
+      "keywords": ["donut", "sweet", "dessert", "glazed", "sugar"]
+    },
+    {
+      "emoji": "🍦",
+      "keywords": ["ice cream", "dessert", "cold", "sweet", "chocolate"]
+    },
+    {
+      "emoji": "🍪",
+      "keywords": ["cookie", "dessert", "sweet", "chocolate chip", "baked"]
+    },
+    {
+      "emoji": "🌮",
+      "keywords": ["taco", "mexican", "food", "spicy", "delicious"]
+    },
+    {
+      "emoji": "🥗",
+      "keywords": ["salad", "healthy", "food", "green", "vegetable"]
+    },
+    {
+      "emoji": "🍓",
+      "keywords": ["strawberry", "fruit", "berry", "sweet", "red"]
+    }
+  ],
+  "actions": [
+    {
+      "emoji": "🏃",
+      "keywords": ["run", "exercise", "tired", "activity", "workout"]
+    },
+    {
+      "emoji": "💃",
+      "keywords": ["dance", "party", "movement", "happy", "fun"]
+    },
+    {
+      "emoji": "🕺",
+      "keywords": ["dance", "party", "movement", "fun", "happy"]
+    },
+    {
+      "emoji": "🤸‍♀️",
+      "keywords": ["cartwheel", "gymnastics", "exercise", "movement", "activity"]
+    },
+    {
+      "emoji": "🚶‍♀️",
+      "keywords": ["walk", "exercise", "stroll", "tired", "movement"]
+    },
+    {
+      "emoji": "🧘‍♂️",
+      "keywords": ["yoga", "stretch", "meditation", "relax", "peace"]
+    },
+    {
+      "emoji": "🤼‍♂️",
+      "keywords": ["wrestling", "sport", "fight", "strength", "activity"]
+    },
+    {
+      "emoji": "🤾‍♀️",
+      "keywords": ["handball", "sport", "game", "exercise", "team"]
+    }
+  ],
+  "objects": [
+    {
+      "emoji": "📱",
+      "keywords": ["phone", "mobile", "technology", "communication", "device"]
+    },
+    {
+      "emoji": "💻",
+      "keywords": ["laptop", "computer", "technology", "work", "internet"]
+    },
+    {
+      "emoji": "🎮",
+      "keywords": ["video game", "gaming", "controller", "fun", "play"]
+    },
+    {
+      "emoji": "📷",
+      "keywords": ["camera", "photography", "photo", "picture", "capture"]
+    },
+    {
+      "emoji": "💡",
+      "keywords": ["light", "bulb", "idea", "energy", "brightness"]
+    },
+    {
+      "emoji": "📚",
+      "keywords": ["books", "reading", "study", "education", "learning"]
+    },
+    {
+      "emoji": "🎧",
+      "keywords": ["headphones", "music", "sound", "listen", "audio"]
+    },
+    {
+      "emoji": "📦",
+      "keywords": ["box", "package", "delivery", "shipment", "cargo"]
+    },
+    {
+      "emoji": "🔒",
+      "keywords": ["lock", "security", "protected", "key", "safe"]
+    }
+  ],
+  "vehicles": [
+    {
+      "emoji": "🚗",
+      "keywords": ["car", "vehicle", "drive", "transportation", "automobile"]
+    },
+    {
+      "emoji": "🚌",
+      "keywords": ["bus", "vehicle", "public transport", "ride", "commute"]
+    },
+    {
+      "emoji": "🚀",
+      "keywords": ["rocket", "space", "travel", "explore", "fast"]
+    },
+    {
+      "emoji": "🚂",
+      "keywords": ["train", "vehicle", "transport", "rail", "journey"]
+    },
+    {
+      "emoji": "🚁",
+      "keywords": ["helicopter", "aircraft", "vehicle", "flight", "transport"]
+    },
+    {
+      "emoji": "🛴",
+      "keywords": ["scooter", "vehicle", "transport", "ride", "fun"]
+    },
+    {
+      "emoji": "🛵",
+      "keywords": ["motorcycle", "bike", "vehicle", "ride", "fast"]
+    }
+  ]
+}
