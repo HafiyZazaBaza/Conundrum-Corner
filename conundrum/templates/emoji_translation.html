@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emoji Translation</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Emoji Translation</h1>
+
+    <button onclick="startRound()">Start Round</button>
+    <div id="prompt"></div>
+
+    <h3>Translate into Emojis</h3>
+    <input id="emojiInput" placeholder="e.g. 🏃💨">
+    <button onclick="submitTranslation()">Submit</button>
+
+    <h3>Guess the Prompt</h3>
+    <input id="guessInput" placeholder="Your guess">
+    <button onclick="submitGuess()">Guess</button>
+
+    <div id="results"></div>
+
+    <script>
+        const socket = io();
+        const room = "emoji_room";
+
+        function startRound() {
+            socket.emit("emoji_start_round", { room });
+        }
+
+        function submitTranslation() {
+            const emoji = document.getElementById("emojiInput").value;
+            socket.emit("emoji_submit_translation", { room, emoji });
+        }
+
+        function submitGuess() {
+            const guess = document.getElementById("guessInput").value;
+            socket.emit("emoji_submit_guess", { room, guess });
+        }
+
+        // Listen
+        socket.on("emoji_new_prompt", data => {
+            document.getElementById("prompt").innerText = "Prompt: " + data.prompt;
+        });
+
+        socket.on("emoji_guess_result", data => {
+            document.getElementById("results").innerText = "Scores: " + JSON.stringify(data.scores);
+        });
+
+        socket.on("emoji_round_end", data => {
+            document.getElementById("results").innerText = "Round Over! " + JSON.stringify(data.rounds);
+        });
+    </script>
+</body>
+</html>
