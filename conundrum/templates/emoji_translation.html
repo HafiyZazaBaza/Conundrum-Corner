@@ -1,54 +1,90 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Emoji Translation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji Translation Game</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-    <h1>Emoji Translation</h1>
+    <h1>Emoji Translation Game</h1>
+    <h2>Prompt: <span id="prompt"></span></h2>
 
-    <button onclick="startRound()">Start Round</button>
-    <div id="prompt"></div>
+    <!-- Display Emoji Translation Section -->
+    <div id="emoji-translation">
+        <label for="translation">Translate into emojis:</label>
+        <input type="text" id="translation" placeholder="Enter emojis" />
+        <button id="submit-translation">Submit Translation</button>
+    </div>
 
-    <h3>Translate into Emojis</h3>
-    <input id="emojiInput" placeholder="e.g. 🏃💨">
-    <button onclick="submitTranslation()">Submit</button>
+    <!-- Display Guessing Section -->
+    <div id="guessing-section" style="display:none;">
+        <label for="guess">Your Guess:</label>
+        <input type="text" id="guess" placeholder="Enter your guess" />
+        <button id="submit-guess">Submit Guess</button>
+    </div>
 
-    <h3>Guess the Prompt</h3>
-    <input id="guessInput" placeholder="Your guess">
-    <button onclick="submitGuess()">Guess</button>
-
-    <div id="results"></div>
+    <!-- Waiting for other players -->
+    <div id="waiting" style="display:none;">
+        <p>Waiting for other players...</p>
+    </div>
 
     <script>
         const socket = io();
-        const room = "emoji_room";
+        const username = "{{ username }}"; // Ensure this is passed from Flask
+        const lobbyCode = "{{ lobby_code }}"; // Same here
 
-        function startRound() {
-            socket.emit("emoji_start_round", { room });
-        }
+        let isHost = false;
+        let isTranslationPhase = true;
 
-        function submitTranslation() {
-            const emoji = document.getElementById("emojiInput").value;
-            socket.emit("emoji_submit_translation", { room, emoji });
-        }
+        // Listening for game updates
+        socket.on("game_update", (data) => {
+            console.log("Received game update:", data);
+            if (data.current_prompt) {
+                document.getElementById("prompt").innerText = data.current_prompt;
+            } else {
+                document.getElementById("prompt").innerText = "Game Over!";
+            }
 
-        function submitGuess() {
-            const guess = document.getElementById("guessInput").value;
-            socket.emit("emoji_submit_guess", { room, guess });
-        }
-
-        // Listen
-        socket.on("emoji_new_prompt", data => {
-            document.getElementById("prompt").innerText = "Prompt: " + data.prompt;
+            if (data.phase === 'guessing') {
+                isTranslationPhase = false;
+                document.getElementById("emoji-translation").style.display = "none";
+                document.getElementById("guessing-section").style.display = "block";
+                document.getElementById("waiting").style.display = "none";
+            } else if (data.phase === 'translation') {
+                isTranslationPhase = true;
+                document.getElementById("emoji-translation").style.display = "block";
+                document.getElementById("guessing-section").style.display = "none";
+                document.getElementById("waiting").style.display = "none";
+            }
         });
 
-        socket.on("emoji_guess_result", data => {
-            document.getElementById("results").innerText = "Scores: " + JSON.stringify(data.scores);
+        // Submit translation (emoji translation)
+        document.getElementById("submit-translation").addEventListener("click", () => {
+            const translation = document.getElementById("translation").value;
+            if (translation) {
+                socket.emit("submit_translation", {
+                    lobbyCode: lobbyCode,
+                    username: username,
+                    translation: translation
+                });
+                document.getElementById("emoji-translation").style.display = "none";
+                document.getElementById("waiting").style.display = "block";  // Show waiting message
+            }
         });
 
-        socket.on("emoji_round_end", data => {
-            document.getElementById("results").innerText = "Round Over! " + JSON.stringify(data.rounds);
+        // Submit guess
+        document.getElementById("submit-guess").addEventListener("click", () => {
+            const guess = document.getElementById("guess").value;
+            if (guess) {
+                socket.emit("submit_guess", {
+                    lobbyCode: lobbyCode,
+                    username: username,
+                    guess: guess
+                });
+                document.getElementById("guessing-section").style.display = "none";
+                document.getElementById("waiting").style.display = "block";  // Show waiting message
+            }
         });
     </script>
 </body>

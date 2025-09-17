@@ -1,4 +1,3 @@
-# conundrum/socket.py
 from flask_socketio import emit, join_room
 from flask import request
 from . import socketio
@@ -75,18 +74,6 @@ def handle_join_lobby(data):
         "players": lobby["players"]
     }, room=lobby_code)
 
-@socketio.on("send_message")
-def handle_send_message(data):
-    lobby_code = data.get("lobbyCode")
-    username = data.get("username")
-    message = data.get("message")
-
-    if not lobby_code or lobby_code not in lobbies or not message:
-        emit("error_message", {"message": "Invalid message."}, room=request.sid)
-        return
-
-    emit("receive_message", {"username": username, "message": message}, room=lobby_code)
-
 @socketio.on("start_game")
 def handle_start_game(data):
     lobby_code = data.get("lobbyCode")
@@ -106,7 +93,11 @@ def handle_start_game(data):
         emit("error_message", {"message": "Game mode required to start."}, room=request.sid)
         return
 
-    # Save the chosen game mode
     lobby["game_mode"] = mode
 
-    emit("game_started", {"lobbyCode": lobby_code, "mode": mode}, room=lobby_code)
+    prompt = get_initial_prompt_for_game(mode)
+    emit("game_started", {"lobbyCode": lobby_code, "mode": mode, "current_prompt": prompt}, room=lobby_code)
+    emit("game_update", {"current_prompt": prompt, "phase": "translation"}, room=lobby_code)  # Send prompt to all players
+
+def get_initial_prompt_for_game(mode):
+    return "Run very fast"  # Example prompt for Emoji Translation
