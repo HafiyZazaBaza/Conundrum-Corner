@@ -313,3 +313,113 @@ button:hover, .small-btn:hover {
     .title { font-size:1.4rem; }
 }
 
+/* Obviously Lies Game Specific Styles */
+#host-section, 
+#question-section, 
+#player-submit-section, 
+#answers-section, 
+#selection-section, 
+#score-section {
+    background-color: var(--card);
+    border: var(--card-border);
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-top: 24px;
+}
+
+#host-section h2,
+#question-section h2,
+#player-submit-section h3,
+#answers-section h3,
+#selection-section h3,
+#score-section h3 {
+    color: var(--accent);
+    margin-bottom: 12px;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+    box-sizing: border-box;
+    transition: border-color 0.25s ease;
+}
+
+input[type="text"]:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 8px rgba(0, 74, 168, 0.3);
+}
+
+button {
+    display: inline-block;
+    padding: 10px 18px;
+    font-weight: 700;
+    border-radius: 8px;
+    cursor: pointer;
+    background-color: var(--accent);
+    color: var(--white);
+    border: none;
+    transition: background-color 0.25s ease, transform 0.2s ease;
+    min-width: 120px;
+}
+
+button:hover:not(:disabled) {
+    background-color: var(--accent-dark);
+    transform: translateY(-2px);
+}
+
+.answer-list {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 15px;
+}
+
+.answer-list li {
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.answer-list li button {
+    min-width: auto;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+#submit-status, #selection-status {
+    margin-top: 10px;
+    color: var(--accent-dark);
+    font-weight: 600;
+    font-style: italic;
+}
+
+#new-round-btn {
+    margin-top: 20px;
+}
+
+/* Disabled buttons for feedback */
+button:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+/* Responsive tweaks */
+@media (max-width: 600px) {
+    button {
+        width: 100%;
+        min-width: unset;
+    }
+    .answer-list li {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+}
