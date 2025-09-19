@@ -423,3 +423,23 @@ button:disabled {
         gap: 6px;
     }
 }
+
+/* Submitted False Answers Live Display */
+#submitted-false-answers {
+    margin-top: 15px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-style: italic;
+    border: var(--card-border);
+    background-color: #fefefe; /* slightly lighter neutral background */
+    padding: 12px 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    color: var(--accent-dark);
+}
+
+#submitted-false-answers li {
+    margin-bottom: 8px;
+    font-size: 1rem;
+    word-break: break-word;
+}

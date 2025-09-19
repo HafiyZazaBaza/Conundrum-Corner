@@ -4,7 +4,7 @@ from flask import request
 from . import socketio
 import random, string
 
-# Lobby state
+# Lobby state: lobby_code -> lobby data
 lobbies = {}
 
 def generate_lobby_code():
@@ -51,6 +51,7 @@ def handle_create_lobby(data):
         "players": lobbies[lobby_code]["players"]
     }, room=lobby_code)
 
+
 @socketio.on("join_lobby")
 def handle_join_lobby(data):
     username = data.get("username")
@@ -81,6 +82,7 @@ def handle_join_lobby(data):
         "players": lobby["players"]
     }, room=lobby_code)
 
+
 @socketio.on("send_message")
 def handle_send_message(data):
     lobby_code = data.get("lobbyCode")
@@ -92,6 +94,7 @@ def handle_send_message(data):
         return
 
     emit("receive_message", {"username": username, "message": message}, room=lobby_code)
+
 
 @socketio.on("start_game")
 def handle_start_game(data):
@@ -120,13 +123,15 @@ def handle_start_game(data):
 
     emit("game_started", {"lobbyCode": lobby_code, "mode": mode}, room=lobby_code)
 
-# --- Obviously Lies specific handlers ---
+
+# --- Obviously Lies game handlers ---
 
 @socketio.on("obviously_lies_start_round")
 def obviously_lies_start_round(data):
     lobby_code = data.get("lobbyCode")
     question = data.get("question")
     correct_answer = data.get("correctAnswer")
+    username = data.get("username")
 
     if not lobby_code or lobby_code not in lobbies:
         emit("error_message", {"message": "Lobby not found."}, room=request.sid)
@@ -136,7 +141,6 @@ def obviously_lies_start_round(data):
         return
 
     lobby = lobbies[lobby_code]
-    username = data.get("username")
     if lobby["host"] != username:
         emit("error_message", {"message": "Only the host can start the round."}, room=request.sid)
         return
@@ -152,8 +156,9 @@ def obviously_lies_start_round(data):
         "finished_selecting": set(),
     }
 
-    # Broadcast question to all players (no correct answer)
+    # Broadcast question to all players (without correct answer)
     emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
+
 
 @socketio.on("obviously_lies_submit_false_answer")
 def obviously_lies_submit_false_answer(data):
@@ -161,7 +166,7 @@ def obviously_lies_submit_false_answer(data):
     player = data.get("player")
     false_answer = data.get("falseAnswer")
 
-    if not lobby_code or lobby_code not in obviously_lies_games:
+    if not lobby_code or lobby_code not in obviously_lies_games or obviously_lies_games[lobby_code] is None:
         emit("error_message", {"message": "Round not found."}, room=request.sid)
         return
 
@@ -176,7 +181,10 @@ def obviously_lies_submit_false_answer(data):
     game["false_answers"][player] = false_answer
     game["finished_submitting"].add(player)
 
-    # Check if all players submitted
+    # Emit newly submitted false answer to all in lobby (including host)
+    emit("obviously_lies_false_answer_submitted", {"player": player, "falseAnswer": false_answer}, room=lobby_code)
+
+    # Check if all players submitted false answers
     if game["finished_submitting"] == game["players"]:
         # Compile answers list including correct
         answers = list(game["false_answers"].values())
@@ -187,13 +195,14 @@ def obviously_lies_submit_false_answer(data):
         # Acknowledge submission, waiting for others
         emit("obviously_lies_false_answer_received", {"player": player}, room=request.sid)
 
+
 @socketio.on("obviously_lies_submit_selection")
 def obviously_lies_submit_selection(data):
     lobby_code = data.get("lobbyCode")
     player = data.get("player")
     selected_answer = data.get("selectedAnswer")
 
-    if not lobby_code or lobby_code not in obviously_lies_games:
+    if not lobby_code or lobby_code not in obviously_lies_games or obviously_lies_games[lobby_code] is None:
         emit("error_message", {"message": "Round not found."}, room=request.sid)
         return
 
