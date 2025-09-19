@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,33 +8,56 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <style>
-    .hidden { display: none; }
-    .answer-list { margin-top: 20px; list-style: none; padding: 0; }
-    .answer-list li { margin-bottom: 10px; }
-    button:disabled { opacity: 0.6; }
-    #submitted-false-answers, 
-    #host-submitted-false-answers {
+    .hidden {
+      display: none;
+    }
+
+    .answer-list {
+      margin-top: 20px;
+      list-style: none;
+      padding: 0;
+    }
+
+    .answer-list li {
+      margin-bottom: 10px;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+    }
+
+    /* Common Styles for False Answers Section */
+    .false-answers-container {
       margin-top: 12px;
       font-style: italic;
       max-height: 150px;
       overflow-y: auto;
       border: 1px solid #ccc;
-      padding: 8px;
+      padding: 12px;
       border-radius: 8px;
       background-color: #f9f9f9;
     }
+
+    .false-answers-container h3 {
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
     #host-correct-answer {
       margin-top: 20px;
       font-weight: bold;
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1>Obviously Lies - Lobby {{ lobby_code }}</h1>
     <p>You are: <strong id="userName">{{ username }}</strong></p>
 
-    <!-- HOST AREA -->
+    <!-- Host Area -->
     <div id="host-section" class="hidden">
       <h2>Host: Create Question</h2>
       <form id="host-form">
@@ -44,13 +68,16 @@
         <button type="submit">Start Round</button>
       </form>
     </div>
-    <!-- Host live false answers display, separate container -->
+
+    <!-- Host Submitted False Answers -->
     <div id="host-submitted-false-answers-container" class="hidden">
-      <h3>Submitted False Answers</h3>
-      <ul id="host-submitted-false-answers"></ul>
+      <div class="false-answers-container">
+        <h3>Submitted False Answers</h3>
+        <ul id="host-submitted-false-answers"></ul>
+      </div>
     </div>
 
-    <!-- PLAYER AREA -->
+    <!-- Player Area -->
     <div id="player-submit-section" class="hidden">
       <h3>Your False Answer</h3>
       <form id="false-answer-form">
@@ -58,30 +85,36 @@
         <button type="submit">Submit Answer</button>
       </form>
       <p id="submit-status"></p>
-      <h3>Submitted False Answers</h3>
-      <ul id="submitted-false-answers"></ul>
+
+      <div class="false-answers-container">
+        <h3>Submitted False Answers</h3>
+        <ul id="submitted-false-answers"></ul>
+      </div>
     </div>
 
+    <!-- Question Section -->
     <div id="question-section" class="hidden">
       <h2>Question:</h2>
       <p id="display-question"></p>
-      <!-- Correct answer displayed for host only -->
       <div id="host-correct-answer" class="hidden">
         Correct Answer: <span id="correct-answer-text"></span>
       </div>
     </div>
 
+    <!-- Answers Section -->
     <div id="answers-section" class="hidden">
       <h3>All Answers</h3>
       <ul id="answers-list" class="answer-list"></ul>
     </div>
 
+    <!-- Selection Section -->
     <div id="selection-section" class="hidden">
       <h3>Select the Correct Answer</h3>
       <ul id="selection-list" class="answer-list"></ul>
       <p id="selection-status"></p>
     </div>
 
+    <!-- Score Section -->
     <div id="score-section" class="hidden">
       <h3>Round Scores</h3>
       <ul id="score-list"></ul>
@@ -114,7 +147,6 @@
       correctAnswer = document.getElementById("answer-input").value.trim();
       if (!question || !correctAnswer) return alert("Please enter both question and correct answer.");
       socket.emit("obviously_lies_start_round", { lobbyCode, question, correctAnswer, username });
-      // Wait for server event to update UI
     });
 
     socket.on("obviously_lies_round_started", data => {
@@ -123,16 +155,10 @@
       document.getElementById("display-question").textContent = question;
 
       if (isHost) {
-        document.getElementById("host-section").classList.add("hidden"); // hide question form
-        // show host submitted false answers container
-        const hostAnswersContainer = document.getElementById("host-submitted-false-answers-container");
-        hostAnswersContainer.classList.remove("hidden");
-
-        // Show correct answer for the host below the question
-        const correctAnswerElement = document.getElementById("host-correct-answer");
-        correctAnswerElement.classList.remove("hidden");
+        document.getElementById("host-section").classList.add("hidden");
+        document.getElementById("host-submitted-false-answers-container").classList.remove("hidden");
+        document.getElementById("host-correct-answer").classList.remove("hidden");
         document.getElementById("correct-answer-text").textContent = correctAnswer;
-        
         clearList(document.getElementById("host-submitted-false-answers"));
       } else {
         document.getElementById("player-submit-section").classList.remove("hidden");
@@ -158,11 +184,9 @@
       e.target.querySelector("button").disabled = true;
     });
 
-    // Live update when any player submits false answer (update both host and player lists)
     socket.on("obviously_lies_false_answer_submitted", data => {
       const { player, falseAnswer } = data;
 
-      // Update player list if visible
       const playerList = document.getElementById("submitted-false-answers");
       if (playerList) {
         const li = document.createElement("li");
@@ -170,7 +194,6 @@
         playerList.appendChild(li);
       }
 
-      // Update host list if visible
       const hostList = document.getElementById("host-submitted-false-answers");
       if (hostList) {
         const li = document.createElement("li");
@@ -182,6 +205,7 @@
     socket.on("obviously_lies_show_answers", data => {
       document.getElementById("player-submit-section").classList.add("hidden");
       document.getElementById("answers-section").classList.remove("hidden");
+
       const answersList = document.getElementById("answers-list");
       answersList.innerHTML = "";
       data.answers.forEach(ans => {
@@ -189,6 +213,7 @@
         li.textContent = ans;
         answersList.appendChild(li);
       });
+
       document.getElementById("selection-section").classList.remove("hidden");
       populateSelectionList(data.answers);
     });
@@ -246,4 +271,5 @@
     });
   </script>
 </body>
+
 </html>
