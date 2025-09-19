@@ -1,4 +1,3 @@
-<!-- templates/obviously_lies.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,6 +21,10 @@
       padding: 8px;
       border-radius: 8px;
       background-color: #f9f9f9;
+    }
+    #host-correct-answer {
+      margin-top: 20px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -62,6 +65,10 @@
     <div id="question-section" class="hidden">
       <h2>Question:</h2>
       <p id="display-question"></p>
+      <!-- Correct answer displayed for host only -->
+      <div id="host-correct-answer" class="hidden">
+        Correct Answer: <span id="correct-answer-text"></span>
+      </div>
     </div>
 
     <div id="answers-section" class="hidden">
@@ -120,6 +127,12 @@
         // show host submitted false answers container
         const hostAnswersContainer = document.getElementById("host-submitted-false-answers-container");
         hostAnswersContainer.classList.remove("hidden");
+
+        // Show correct answer for the host below the question
+        const correctAnswerElement = document.getElementById("host-correct-answer");
+        correctAnswerElement.classList.remove("hidden");
+        document.getElementById("correct-answer-text").textContent = correctAnswer;
+        
         clearList(document.getElementById("host-submitted-false-answers"));
       } else {
         document.getElementById("player-submit-section").classList.remove("hidden");

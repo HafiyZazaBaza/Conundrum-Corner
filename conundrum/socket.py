@@ -1,4 +1,3 @@
-# conundrum/socket.py
 from flask_socketio import emit, join_room
 from flask import request
 from . import socketio
@@ -158,6 +157,9 @@ def obviously_lies_start_round(data):
 
     # Broadcast question to all players (without correct answer)
     emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
+
+    # Emit the correct answer to the host only
+    emit("obviously_lies_round_started", {"correctAnswer": correct_answer}, room=lobby["host"])
 
 
 @socketio.on("obviously_lies_submit_false_answer")
