@@ -82,19 +82,28 @@
       }
     });
 
-    // Host starts round
+    // Host starts round by submitting question and correct answer
     document.getElementById("host-form").addEventListener("submit", e => {
       e.preventDefault();
       question = document.getElementById("question-input").value.trim();
       correctAnswer = document.getElementById("answer-input").value.trim();
       if (!question || !correctAnswer) return alert("Please enter both question and correct answer.");
-      socket.emit("obviously_lies_start_round", { lobbyCode, question, correctAnswer });
-      // Hide host form after submission
-      document.getElementById("host-section").classList.add("hidden");
-      // Show question for all
+      socket.emit("obviously_lies_start_round", { lobbyCode, question, correctAnswer, username });
+      // Do NOT hide host form here; wait for server event to update UI
+    });
+
+    // When server notifies that round started with question
+    socket.on("obviously_lies_round_started", data => {
+      question = data.question || "";
+      // Show question section for all
       document.getElementById("question-section").classList.remove("hidden");
       document.getElementById("display-question").textContent = question;
-      // Show player submit section for others
+
+      // Host hides the host form after starting round
+      if (isHost) {
+        document.getElementById("host-section").classList.add("hidden");
+      }
+      // Players show false answer submission UI
       if (!isHost) {
         document.getElementById("player-submit-section").classList.remove("hidden");
       }
@@ -108,23 +117,23 @@
       socket.emit("obviously_lies_submit_false_answer", { lobbyCode, player: username, falseAnswer });
       document.getElementById("submit-status").textContent = "Submitted! Waiting for others...";
       document.getElementById("false-answer-input").value = "";
-      // Disable input after submitting
+      // Disable input + button after submitting
       document.getElementById("false-answer-input").disabled = true;
       e.target.querySelector("button").disabled = true;
     });
 
-    // Receive info to show all answers (including correct)
+    // Receive all answers including correct answer
     socket.on("obviously_lies_show_answers", data => {
       document.getElementById("player-submit-section").classList.add("hidden");
       document.getElementById("answers-section").classList.remove("hidden");
       const answersList = document.getElementById("answers-list");
       answersList.innerHTML = "";
-      data.answers.forEach((ans, idx) => {
+      data.answers.forEach(ans => {
         const li = document.createElement("li");
         li.textContent = ans;
         answersList.appendChild(li);
       });
-      // Show selection UI
+      // Show selection UI for picking correct answer
       document.getElementById("selection-section").classList.remove("hidden");
       populateSelectionList(data.answers);
     });
@@ -132,13 +141,13 @@
     function populateSelectionList(answers) {
       const selectionList = document.getElementById("selection-list");
       selectionList.innerHTML = "";
-      answers.forEach((ans, idx) => {
+      answers.forEach(ans => {
         const li = document.createElement("li");
         const btn = document.createElement("button");
         btn.textContent = `Select: ${ans}`;
         btn.addEventListener("click", () => {
           socket.emit("obviously_lies_submit_selection", { lobbyCode, player: username, selectedAnswer: ans });
-          // Disable buttons after selection
+          // Disable all buttons after selection
           Array.from(selectionList.querySelectorAll("button")).forEach(b => b.disabled = true);
           document.getElementById("selection-status").textContent = "Selection submitted! Waiting for others...";
         });
@@ -147,7 +156,7 @@
       });
     }
 
-    // Receive round results: scores for each player
+    // Receive round scores and show leaderboard
     socket.on("obviously_lies_round_results", data => {
       document.getElementById("selection-section").classList.add("hidden");
       document.getElementById("answers-section").classList.add("hidden");
@@ -162,14 +171,15 @@
       }
     });
 
-    // Starting new round (host only)
+    // Host starts new round UI reset
     document.getElementById("new-round-btn").addEventListener("click", () => {
       if (!isHost) return alert("Only host can start new rounds.");
-      // Reset UI
+      // Reset UI for new round
       document.getElementById("score-section").classList.add("hidden");
       document.getElementById("host-section").classList.remove("hidden");
       document.getElementById("question-input").value = "";
       document.getElementById("answer-input").value = "";
+      document.getElementById("question-section").classList.add("hidden");
     });
   </script>
 </body>

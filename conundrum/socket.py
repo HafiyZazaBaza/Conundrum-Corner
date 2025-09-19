@@ -152,7 +152,7 @@ def obviously_lies_start_round(data):
         "finished_selecting": set(),
     }
 
-    # Broadcast question to all players
+    # Broadcast question to all players (no correct answer)
     emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
 
 @socketio.on("obviously_lies_submit_false_answer")
@@ -210,7 +210,6 @@ def obviously_lies_submit_selection(data):
 
     # Check if all players selected
     if game["finished_selecting"] == game["players"]:
-        # Calculate scores
         scores = {p: 0 for p in game["players"]}
         correct_answer = game["correct_answer"]
         false_answers = game["false_answers"]
@@ -227,7 +226,6 @@ def obviously_lies_submit_selection(data):
                     scores[p] += 1
 
         emit("obviously_lies_round_results", {"scores": scores}, room=lobby_code)
-        # Clean up round data for lobby
-        obviously_lies_games[lobby_code] = None
+        obviously_lies_games[lobby_code] = None  # Reset round data
     else:
         emit("obviously_lies_selection_received", {"player": player}, room=request.sid)
