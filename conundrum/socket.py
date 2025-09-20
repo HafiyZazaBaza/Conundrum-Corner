@@ -3,21 +3,16 @@ from flask import request
 from . import socketio
 import random, string
 
-
 # Lobby state: lobby_code -> lobby data
 lobbies = {}
-
 
 def generate_lobby_code():
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
 
-
 # Obviously Lies game state container per lobby
 obviously_lies_games = {}
 
-
 # --- Lobby management ---
-
 
 @socketio.on("create_lobby")
 def handle_create_lobby(data):
@@ -55,7 +50,6 @@ def handle_create_lobby(data):
         "players": lobbies[lobby_code]["players"]
     }, room=lobby_code)
 
-
 @socketio.on("join_lobby")
 def handle_join_lobby(data):
     username = data.get("username")
@@ -86,7 +80,6 @@ def handle_join_lobby(data):
         "players": lobby["players"]
     }, room=lobby_code)
 
-
 @socketio.on("send_message")
 def handle_send_message(data):
     lobby_code = data.get("lobbyCode")
@@ -98,7 +91,6 @@ def handle_send_message(data):
         return
 
     emit("receive_message", {"username": username, "message": message}, room=lobby_code)
-
 
 @socketio.on("start_game")
 def handle_start_game(data):
@@ -121,15 +113,12 @@ def handle_start_game(data):
 
     lobby["game_mode"] = mode
 
-    # Clear any existing obviously lies game data if new game starts
     if mode == "obviously_lies":
         obviously_lies_games[lobby_code] = None
 
     emit("game_started", {"lobbyCode": lobby_code, "mode": mode}, room=lobby_code)
 
-
 # --- Obviously Lies game handlers ---
-
 
 @socketio.on("obviously_lies_start_round")
 def obviously_lies_start_round(data):
@@ -155,16 +144,15 @@ def obviously_lies_start_round(data):
         "question": question,
         "correct_answer": correct_answer,
         "players": players,
-        "false_answers": {},  # player -> false answer
+        "false_answers": {},
         "finished_submitting": set(),
     }
 
     # Broadcast question to all players (without correct answer)
     emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
 
-    # Emit the correct answer to the host only
-    emit("obviously_lies_round_started", {"correctAnswer": correct_answer}, room=lobby["host"])
-
+    # Immediately emit the correct answer as part of the anonymous answers list
+    emit("obviously_lies_all_answers", {"answers": [correct_answer]}, room=lobby_code)
 
 @socketio.on("obviously_lies_submit_false_answer")
 def obviously_lies_submit_false_answer(data):
@@ -187,8 +175,13 @@ def obviously_lies_submit_false_answer(data):
     game["false_answers"][player] = false_answer
     game["finished_submitting"].add(player)
 
-    # Emit newly submitted false answer to all in lobby (including host)
-    emit("obviously_lies_false_answer_submitted", {"player": player, "falseAnswer": false_answer}, room=lobby_code)
+    # Emit newly submitted false answer anonymously (without player names) to all in lobby including host
+    emit("obviously_lies_false_answer_submitted", {"falseAnswer": false_answer}, room=lobby_code)
 
-    # No voting or selection steps — end round or wait as appropriate.
+    # Once all players have submitted, emit all answers (including correct answer disguised among them)
+    if len(game["finished_submitting"]) == len(game["players"]):
+        all_answers = list(game["false_answers"].values()) + [game["correct_answer"]]
+        random.shuffle(all_answers)
 
+        # Emit all answers anonymously to all players including host
+        emit("obviously_lies_all_answers", {"answers": all_answers}, room=lobby_code)
