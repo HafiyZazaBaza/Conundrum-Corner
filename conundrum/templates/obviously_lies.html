@@ -26,7 +26,6 @@
       opacity: 0.6;
     }
 
-    /* Common Styles for False Answers Section */
     .false-answers-container {
       margin-top: 12px;
       font-style: italic;
@@ -99,26 +98,6 @@
       <div id="host-correct-answer" class="hidden">
         Correct Answer: <span id="correct-answer-text"></span>
       </div>
-    </div>
-
-    <!-- Answers Section -->
-    <div id="answers-section" class="hidden">
-      <h3>All Answers</h3>
-      <ul id="answers-list" class="answer-list"></ul>
-    </div>
-
-    <!-- Selection Section -->
-    <div id="selection-section" class="hidden">
-      <h3>Select the Correct Answer</h3>
-      <ul id="selection-list" class="answer-list"></ul>
-      <p id="selection-status"></p>
-    </div>
-
-    <!-- Score Section -->
-    <div id="score-section" class="hidden">
-      <h3>Round Scores</h3>
-      <ul id="score-list"></ul>
-      <button id="new-round-btn">Start New Round</button>
     </div>
   </div>
 
@@ -200,74 +179,6 @@
         li.textContent = `${player}: ${falseAnswer}`;
         hostList.appendChild(li);
       }
-    });
-
-    socket.on("obviously_lies_show_answers", data => {
-      document.getElementById("player-submit-section").classList.add("hidden");
-      document.getElementById("answers-section").classList.remove("hidden");
-
-      const answersList = document.getElementById("answers-list");
-      answersList.innerHTML = "";
-      data.answers.forEach(ans => {
-        const li = document.createElement("li");
-        li.textContent = ans;
-        answersList.appendChild(li);
-      });
-
-      document.getElementById("selection-section").classList.remove("hidden");
-      populateSelectionList(data.answers);
-    });
-
-    function populateSelectionList(answers) {
-      const selectionList = document.getElementById("selection-list");
-      selectionList.innerHTML = "";
-      answers.forEach(ans => {
-        const li = document.createElement("li");
-        const btn = document.createElement("button");
-        btn.textContent = `Select: ${ans}`;
-        btn.addEventListener("click", () => {
-          socket.emit("obviously_lies_submit_selection", { lobbyCode, player: username, selectedAnswer: ans });
-          Array.from(selectionList.querySelectorAll("button")).forEach(b => b.disabled = true);
-          document.getElementById("selection-status").textContent = "Selection submitted! Waiting for others...";
-        });
-        li.appendChild(btn);
-        selectionList.appendChild(li);
-      });
-    }
-
-    socket.on("obviously_lies_round_results", data => {
-      document.getElementById("selection-section").classList.add("hidden");
-      document.getElementById("answers-section").classList.add("hidden");
-      const scoreSection = document.getElementById("score-section");
-      scoreSection.classList.remove("hidden");
-      const scoreList = document.getElementById("score-list");
-      scoreList.innerHTML = "";
-      for (const [player, score] of Object.entries(data.scores)) {
-        const li = document.createElement("li");
-        li.textContent = `${player}: ${score} point${score !== 1 ? "s" : ""}`;
-        scoreList.appendChild(li);
-      }
-    });
-
-    document.getElementById("new-round-btn").addEventListener("click", () => {
-      if (!isHost) return alert("Only host can start new rounds.");
-      document.getElementById("score-section").classList.add("hidden");
-      document.getElementById("host-section").classList.remove("hidden");
-      document.getElementById("question-input").value = "";
-      document.getElementById("answer-input").value = "";
-      document.getElementById("question-section").classList.add("hidden");
-
-      document.getElementById("submit-status").textContent = "";
-      const falseInput = document.getElementById("false-answer-input");
-      falseInput.disabled = false;
-      falseInput.value = "";
-      document.querySelector("#false-answer-form button").disabled = false;
-
-      clearList(document.getElementById("submitted-false-answers"));
-      clearList(document.getElementById("host-submitted-false-answers"));
-
-      document.getElementById("host-submitted-false-answers-container").classList.add("hidden");
-      document.getElementById("player-submit-section").classList.add("hidden");
     });
   </script>
 </body>
