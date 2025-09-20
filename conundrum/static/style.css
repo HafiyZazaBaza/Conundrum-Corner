@@ -6,18 +6,23 @@
     --text-dark: #222;
     --white: #ffffff;
     --card-border: 2px solid var(--accent);
+    --vote-button-bg: #0052cc;
+    --vote-button-hover-bg: #003a88;
+    --vote-button-voted-bg: #28a745; /* green for voted */
 }
+
 
 /* ---------- General Page ---------- */
 body {
     font-family: Arial, Helvetica, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: var(--bg); /* main background */
+    background-color: var(--bg);
     color: var(--text-dark);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
+
 
 /* Shared container (used by home and lobby) */
 .container {
@@ -27,6 +32,7 @@ body {
     box-sizing: border-box;
 }
 
+
 /* ---------- Headings ---------- */
 h1, .title {
     color: var(--white);
@@ -34,10 +40,12 @@ h1, .title {
     margin: 0;
 }
 
+
 h2 {
     color: var(--accent);
     margin-bottom: 15px;
 }
+
 
 /* ---------- Form / Home layout ---------- */
 .forms-wrapper {
@@ -47,15 +55,17 @@ h2 {
     margin: 20px 0;
 }
 
+
 .form-box {
-    background-color: var(--card); /* form background */
+    background-color: var(--card);
     padding: 25px;
-    flex: 1; /* equal width for both boxes */
+    flex: 1;
     border-radius: 15px;
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
     text-align: left;
     border: var(--card-border);
 }
+
 
 label {
     display: block;
@@ -63,6 +73,7 @@ label {
     font-weight: bold;
     color: var(--text-dark);
 }
+
 
 input, select {
     width: 100%;
@@ -74,17 +85,19 @@ input, select {
     box-sizing: border-box;
 }
 
+
 input:focus, select:focus {
     border-color: var(--accent);
     outline: none;
     box-shadow: 0 0 6px rgba(0, 58, 136, 0.18);
 }
 
+
 /* Use full-width buttons inside form boxes (home create/join) */
 .form-box button {
     width: 100%;
     padding: 12px;
-    background-color: var(--accent); /* button background */
+    background-color: var(--accent);
     color: var(--white);
     font-size: 1rem;
     font-weight: bold;
@@ -94,11 +107,13 @@ input:focus, select:focus {
     transition: 0.18s ease;
 }
 
+
 .form-box button:hover {
     background-color: var(--accent-dark);
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
 }
+
 
 /* Global button defaults (small) — lobby will use these unless inside .form-box */
 button {
@@ -114,6 +129,7 @@ button {
     min-width: 64px;
 }
 
+
 /* small-button helper */
 .small-btn {
     padding: 8px 12px;
@@ -121,11 +137,12 @@ button {
     border-radius: 8px;
 }
 
-/* small hover */
+
 button:hover, .small-btn:hover {
     background-color: var(--accent-dark);
     transform: translateY(-1px);
 }
+
 
 /* ---------- Cards (players/chat) - shared look ---------- */
 .card {
@@ -137,10 +154,12 @@ button:hover, .small-btn:hover {
     box-sizing: border-box;
 }
 
+
 /* Lobby specific layout */
 .lobby-container {
     margin-top: 24px;
 }
+
 
 /* Top row */
 .top-row {
@@ -150,16 +169,19 @@ button:hover, .small-btn:hover {
     margin-bottom: 12px;
 }
 
+
 /* top actions align right */
 .top-actions {
     margin-left: auto;
 }
+
 
 /* quick you-line */
 .you-line {
     margin: 10px 0 14px;
     color: var(--white);
 }
+
 
 /* Grid: players + chat */
 .lobby-grid {
@@ -168,6 +190,7 @@ button:hover, .small-btn:hover {
     gap: 18px;
     align-items: start;
 }
+
 
 /* Players card */
 .players-card .card-header,
@@ -179,6 +202,7 @@ button:hover, .small-btn:hover {
     color: var(--text-dark);
 }
 
+
 .players-list {
     list-style: disc;
     padding-left: 18px;
@@ -186,6 +210,7 @@ button:hover, .small-btn:hover {
     overflow: auto;
     margin: 0;
 }
+
 
 .player-item {
     padding: 8px 6px;
@@ -195,6 +220,7 @@ button:hover, .small-btn:hover {
     gap: 8px;
     border-radius: 6px;
 }
+
 
 /* Host badge styles */
 .host-badge {
@@ -209,6 +235,7 @@ button:hover, .small-btn:hover {
     font-weight: 700;
 }
 
+
 .host-badge-inline {
     display: inline-block;
     background: rgba(255, 255, 255, 0.12);
@@ -219,6 +246,7 @@ button:hover, .small-btn:hover {
     margin-left: 8px;
 }
 
+
 /* Host control area */
 .host-controls {
     margin-top: 12px;
@@ -227,11 +255,13 @@ button:hover, .small-btn:hover {
     gap: 8px;
 }
 
+
 .label-inline {
     font-weight: 700;
     font-size: 0.95rem;
     color: var(--text-dark);
 }
+
 
 .select-control {
     padding: 8px;
@@ -240,12 +270,14 @@ button:hover, .small-btn:hover {
     font-size: 0.95rem;
 }
 
+
 /* Small host actions container */
 .host-actions {
     display: flex;
     gap: 8px;
     margin-top: 4px;
 }
+
 
 /* Waiting text for non-hosts */
 .waiting-note {
@@ -254,12 +286,14 @@ button:hover, .small-btn:hover {
     font-style: italic;
 }
 
+
 /* Chat card specifics */
 .chat-card {
     display: flex;
     flex-direction: column;
     height: 100%;
 }
+
 
 .messages {
     background: #ffffff;
@@ -272,11 +306,13 @@ button:hover, .small-btn:hover {
     box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
+
 .message-line {
     margin: 6px 0;
     line-height: 1.25;
     font-size: 0.96rem;
 }
+
 
 /* Chat form input + send */
 .chat-form {
@@ -285,6 +321,7 @@ button:hover, .small-btn:hover {
     margin-top: 10px;
     align-items: center;
 }
+
 
 .chat-input {
     flex: 1;
@@ -295,11 +332,13 @@ button:hover, .small-btn:hover {
     box-sizing: border-box;
 }
 
+
 /* smaller send button */
 .chat-form .small-btn {
     padding: 8px 12px;
     min-width: 76px;
 }
+
 
 /* ---------- responsive ---------- */
 @media (max-width: 850px) {
@@ -317,6 +356,7 @@ button:hover, .small-btn:hover {
     }
 }
 
+
 /* Obviously Lies Game Specific Styles */
 #host-section, 
 #question-section, 
@@ -333,6 +373,7 @@ button:hover, .small-btn:hover {
     transition: box-shadow 0.25s ease;
 }
 
+
 #host-section h2,
 #question-section h2,
 #player-submit-section h3,
@@ -345,6 +386,7 @@ button:hover, .small-btn:hover {
     font-weight: 600;
 }
 
+
 input[type="text"] {
     width: 100%;
     padding: 12px;
@@ -355,11 +397,13 @@ input[type="text"] {
     transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
+
 input[type="text"]:focus {
     border-color: var(--accent);
     outline: none;
     box-shadow: 0 0 8px rgba(0, 74, 168, 0.3);
 }
+
 
 button {
     display: inline-block;
@@ -374,16 +418,19 @@ button {
     min-width: 120px;
 }
 
+
 button:hover:not(:disabled) {
     background-color: var(--accent-dark);
     transform: translateY(-2px);
 }
+
 
 .answer-list {
     list-style: none;
     padding-left: 0;
     margin-top: 15px;
 }
+
 
 .answer-list li {
     margin-bottom: 14px;
@@ -393,6 +440,7 @@ button:hover:not(:disabled) {
     justify-content: space-between;
 }
 
+
 .answer-list li button {
     min-width: auto;
     padding: 8px 16px;
@@ -401,6 +449,7 @@ button:hover:not(:disabled) {
     border-radius: 6px;
 }
 
+
 #submit-status, #selection-status {
     margin-top: 12px;
     color: var(--accent-dark);
@@ -408,15 +457,18 @@ button:hover:not(:disabled) {
     font-style: italic;
 }
 
+
 #new-round-btn {
     margin-top: 24px;
 }
+
 
 /* Disabled buttons for feedback */
 button:disabled {
     cursor: default;
     opacity: 0.6;
 }
+
 
 /* Responsive tweaks */
 @media (max-width: 600px) {
@@ -430,6 +482,7 @@ button:disabled {
         gap: 6px;
     }
 }
+
 
 /* Submitted False Answers Live Display */
 #submitted-false-answers {
@@ -445,8 +498,80 @@ button:disabled {
     color: var(--accent-dark);
 }
 
+
 #submitted-false-answers li {
     margin-bottom: 10px;
     font-size: 1rem;
     word-break: break-word;
+}
+
+
+/* Obviously Lies Submitted Answers container */
+.answer-container {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background-color: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: var(--card-border);
+    position: relative;
+    font-size: 1.1rem;
+    color: var(--text-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+/* Vote button */
+.vote-button {
+    background-color: var(--vote-button-bg);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    cursor: pointer;
+    min-width: 80px;
+    transition: background-color 0.25s ease, transform 0.15s ease;
+    user-select: none;
+    box-shadow: 0 2px 6px rgba(0, 82, 204, 0.4);
+}
+
+
+.vote-button:hover:not(:disabled) {
+    background-color: var(--vote-button-hover-bg);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 58, 136, 0.6);
+}
+
+
+.vote-button:disabled {
+    cursor: default;
+    opacity: 0.6;
+    box-shadow: none;
+}
+
+
+/* Voted state */
+.vote-button.voted {
+    background-color: var(--vote-button-voted-bg);
+    cursor: default;
+    transform: none;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.7);
+}
+
+
+/* Responsive tweaks for vote button and answer container */
+@media (max-width: 600px) {
+    .answer-container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .vote-button {
+        width: 100%;
+        min-width: unset;
+    }
 }

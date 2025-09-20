@@ -21,6 +21,14 @@
       padding: 10px;
       background-color: #f0f0f0;
       border-radius: 5px;
+      position: relative;
+    }
+
+    .vote-button {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -64,7 +72,6 @@
       <h3>Submitted Answers</h3>
       <div id="submitted-answers"></div>
     </div>
-
   </div>
 
   <script>
@@ -124,25 +131,49 @@
       e.target.querySelector("button").disabled = true;
     });
 
-    // Display submitted false answers anonymously (without player names)
+    function createAnswerContainer(answer) {
+      const container = document.createElement("div");
+      container.classList.add("answer-container");
+      container.textContent = answer;
+
+      // Create vote button
+      const voteBtn = document.createElement("button");
+      voteBtn.classList.add("vote-button");
+      voteBtn.textContent = "Vote";
+      voteBtn.onclick = () => {
+        // Disable the button to prevent multiple clicks
+        voteBtn.disabled = true;
+        voteBtn.textContent = "Voted!";
+        socket.emit("obviously_lies_vote", { lobbyCode, player: username, answer });
+
+        // Optionally revert text to "Vote" after 2 seconds
+        setTimeout(() => {
+          voteBtn.textContent = "Vote";
+          voteBtn.disabled = false;
+        }, 2000);
+      };
+      container.appendChild(voteBtn);
+
+      return container;
+    }
+
+    // Display submitted false answers anonymously with vote button
     socket.on("obviously_lies_false_answer_submitted", data => {
-      const answerContainer = document.createElement("div");
-      answerContainer.classList.add("answer-container");
-      answerContainer.textContent = data.falseAnswer; // Show only answer text
+      const answerContainer = createAnswerContainer(data.falseAnswer);
       document.getElementById("submitted-answers").appendChild(answerContainer);
     });
 
-    // When all answers (including correct one) are ready, display all anonymously
+    // When all answers (including correct one) are ready, display all anonymously with vote buttons
     socket.on("obviously_lies_all_answers", data => {
       const answersDiv = document.getElementById("submitted-answers");
       answersDiv.innerHTML = ""; // Clear previous answers
+
       data.answers.forEach(answer => {
-        const answerContainer = document.createElement("div");
-        answerContainer.classList.add("answer-container");
-        answerContainer.textContent = answer; // Show only answer text
+        const answerContainer = createAnswerContainer(answer);
         answersDiv.appendChild(answerContainer);
       });
     });
   </script>
 </body>
+
 </html>
