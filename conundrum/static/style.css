@@ -1,4 +1,4 @@
-:root{
+:root {
     --bg: #074ca8;
     --accent: #003a88;
     --accent-dark: #002b66;
@@ -15,8 +15,8 @@ body {
     padding: 0;
     background-color: var(--bg); /* main background */
     color: var(--text-dark);
-    -webkit-font-smoothing:antialiased;
-    -moz-osx-font-smoothing:grayscale;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Shared container (used by home and lobby) */
@@ -52,7 +52,7 @@ h2 {
     padding: 25px;
     flex: 1; /* equal width for both boxes */
     border-radius: 15px;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.12);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
     text-align: left;
     border: var(--card-border);
 }
@@ -77,7 +77,7 @@ input, select {
 input:focus, select:focus {
     border-color: var(--accent);
     outline: none;
-    box-shadow: 0 0 6px rgba(0,58,136,0.18);
+    box-shadow: 0 0 6px rgba(0, 58, 136, 0.18);
 }
 
 /* Use full-width buttons inside form boxes (home create/join) */
@@ -97,7 +97,7 @@ input:focus, select:focus {
 .form-box button:hover {
     background-color: var(--accent-dark);
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
 }
 
 /* Global button defaults (small) — lobby will use these unless inside .form-box */
@@ -132,7 +132,7 @@ button:hover, .small-btn:hover {
     background: var(--card);
     border-radius: 12px;
     padding: 14px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
     border: var(--card-border);
     box-sizing: border-box;
 }
@@ -144,15 +144,15 @@ button:hover, .small-btn:hover {
 
 /* Top row */
 .top-row {
-    display:flex;
-    align-items:center;
-    gap:12px;
-    margin-bottom:12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 /* top actions align right */
 .top-actions {
-    margin-left:auto;
+    margin-left: auto;
 }
 
 /* quick you-line */
@@ -172,10 +172,10 @@ button:hover, .small-btn:hover {
 /* Players card */
 .players-card .card-header,
 .chat-card .card-header {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
     color: var(--text-dark);
 }
 
@@ -183,35 +183,35 @@ button:hover, .small-btn:hover {
     list-style: disc;
     padding-left: 18px;
     max-height: 360px;
-    overflow:auto;
+    overflow: auto;
     margin: 0;
 }
 
 .player-item {
     padding: 8px 6px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    border-radius:6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-radius: 6px;
 }
 
 /* Host badge styles */
 .host-badge {
-    display:inline-block;
-    margin-left:10px;
+    display: inline-block;
+    margin-left: 10px;
     background: var(--accent);
     color: var(--white);
     padding: 2px 8px;
     border-radius: 999px;
     font-size: 0.78rem;
     vertical-align: middle;
-    font-weight:700;
+    font-weight: 700;
 }
 
 .host-badge-inline {
-    display:inline-block;
-    background: rgba(255,255,255,0.12);
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.12);
     color: var(--white);
     padding: 3px 8px;
     border-radius: 8px;
@@ -221,43 +221,43 @@ button:hover, .small-btn:hover {
 
 /* Host control area */
 .host-controls {
-    margin-top:12px;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .label-inline {
-    font-weight:700;
-    font-size:0.95rem;
-    color:var(--text-dark);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-dark);
 }
 
 .select-control {
-    padding:8px;
-    border-radius:8px;
-    border:1px solid #cfcfcf;
-    font-size:0.95rem;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #cfcfcf;
+    font-size: 0.95rem;
 }
 
 /* Small host actions container */
 .host-actions {
-    display:flex;
-    gap:8px;
-    margin-top:4px;
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
 }
 
 /* Waiting text for non-hosts */
 .waiting-note {
-    margin-top:12px;
+    margin-top: 12px;
     color: #333;
-    font-style:italic;
+    font-style: italic;
 }
 
 /* Chat card specifics */
 .chat-card {
-    display:flex;
-    flex-direction:column;
+    display: flex;
+    flex-direction: column;
     height: 100%;
 }
 
@@ -269,7 +269,7 @@ button:hover, .small-btn:hover {
     max-height: 420px;
     overflow-y: auto;
     border: 1px solid #e3e3e3;
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.03);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
 .message-line {
@@ -280,19 +280,19 @@ button:hover, .small-btn:hover {
 
 /* Chat form input + send */
 .chat-form {
-    display:flex;
-    gap:8px;
-    margin-top:10px;
-    align-items:center;
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
 }
 
 .chat-input {
-    flex:1;
-    padding:10px 12px;
-    border-radius:8px;
-    border:1px solid #ccc;
-    font-size:0.95rem;
-    box-sizing:border-box;
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 0.95rem;
+    box-sizing: border-box;
 }
 
 /* smaller send button */
@@ -307,10 +307,14 @@ button:hover, .small-btn:hover {
         grid-template-columns: 1fr;
     }
     .players-card, .chat-card {
-        width:100%;
+        width: 100%;
     }
-    .container { padding:14px; }
-    .title { font-size:1.4rem; }
+    .container {
+        padding: 14px;
+    }
+    .title {
+        font-size: 1.4rem;
+    }
 }
 
 /* Obviously Lies Game Specific Styles */
@@ -323,9 +327,10 @@ button:hover, .small-btn:hover {
     background-color: var(--card);
     border: var(--card-border);
     border-radius: 12px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
-    padding: 20px;
-    margin-top: 24px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    margin-top: 32px;
+    transition: box-shadow 0.25s ease;
 }
 
 #host-section h2,
@@ -335,17 +340,19 @@ button:hover, .small-btn:hover {
 #selection-section h3,
 #score-section h3 {
     color: var(--accent);
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+    font-size: 1.2rem;
+    font-weight: 600;
 }
 
 input[type="text"] {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     border-radius: 8px;
     border: 1px solid #ccc;
     font-size: 1rem;
     box-sizing: border-box;
-    transition: border-color 0.25s ease;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 input[type="text"]:focus {
@@ -356,7 +363,7 @@ input[type="text"]:focus {
 
 button {
     display: inline-block;
-    padding: 10px 18px;
+    padding: 12px 20px;
     font-weight: 700;
     border-radius: 8px;
     cursor: pointer;
@@ -379,7 +386,7 @@ button:hover:not(:disabled) {
 }
 
 .answer-list li {
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     font-size: 1.1rem;
     display: flex;
     align-items: center;
@@ -388,21 +395,21 @@ button:hover:not(:disabled) {
 
 .answer-list li button {
     min-width: auto;
-    padding: 6px 12px;
+    padding: 8px 16px;
     font-size: 0.9rem;
     font-weight: 600;
     border-radius: 6px;
 }
 
 #submit-status, #selection-status {
-    margin-top: 10px;
+    margin-top: 12px;
     color: var(--accent-dark);
     font-weight: 600;
     font-style: italic;
 }
 
 #new-round-btn {
-    margin-top: 20px;
+    margin-top: 24px;
 }
 
 /* Disabled buttons for feedback */
@@ -422,4 +429,24 @@ button:disabled {
         align-items: flex-start;
         gap: 6px;
     }
+}
+
+/* Submitted False Answers Live Display */
+#submitted-false-answers {
+    margin-top: 18px;
+    max-height: 180px;
+    overflow-y: auto;
+    font-style: italic;
+    border: var(--card-border);
+    background-color: #fefefe; /* slightly lighter neutral background */
+    padding: 14px 18px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    color: var(--accent-dark);
+}
+
+#submitted-false-answers li {
+    margin-bottom: 10px;
+    font-size: 1rem;
+    word-break: break-word;
 }

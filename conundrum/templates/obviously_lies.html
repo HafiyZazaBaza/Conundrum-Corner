@@ -1,6 +1,6 @@
-<!-- templates/obviously_lies.html -->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,17 +8,29 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <style>
-    .hidden { display: none; }
-    .answer-list { margin-top: 20px; list-style: none; padding: 0; }
-    .answer-list li { margin-bottom: 10px; }
-    button:disabled { opacity: 0.6; }
+    .hidden {
+      display: none;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+    }
+
+    .answer-container {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-radius: 5px;
+    }
   </style>
 </head>
+
 <body>
   <div class="container">
-    <h1>Obviously Lies - Lobby {{ lobby_code }}</h1>
+    <h1>Obviously Lies 🤥</h1>
     <p>You are: <strong id="userName">{{ username }}</strong></p>
 
+    <!-- Host Area -->
     <div id="host-section" class="hidden">
       <h2>Host: Create Question</h2>
       <form id="host-form">
@@ -30,11 +42,14 @@
       </form>
     </div>
 
+    <!-- Question Section -->
     <div id="question-section" class="hidden">
       <h2>Question:</h2>
       <p id="display-question"></p>
+      <!-- Removed correct answer display -->
     </div>
 
+    <!-- Player Area -->
     <div id="player-submit-section" class="hidden">
       <h3>Your False Answer</h3>
       <form id="false-answer-form">
@@ -44,22 +59,12 @@
       <p id="submit-status"></p>
     </div>
 
-    <div id="answers-section" class="hidden">
-      <h3>All Answers</h3>
-      <ul id="answers-list" class="answer-list"></ul>
+    <!-- Display Submitted Answers -->
+    <div id="submitted-answers-section" class="hidden">
+      <h3>Submitted Answers</h3>
+      <div id="submitted-answers"></div>
     </div>
 
-    <div id="selection-section" class="hidden">
-      <h3>Select the Correct Answer</h3>
-      <ul id="selection-list" class="answer-list"></ul>
-      <p id="selection-status"></p>
-    </div>
-
-    <div id="score-section" class="hidden">
-      <h3>Round Scores</h3>
-      <ul id="score-list"></ul>
-      <button id="new-round-btn">Start New Round</button>
-    </div>
   </div>
 
   <script>
@@ -70,7 +75,6 @@
     let question = "";
     let correctAnswer = "";
 
-    // Determine if user is host by comparing with lobby host
     socket.on("connect", () => {
       socket.emit("join_lobby", { username, lobbyCode });
     });
@@ -82,94 +86,62 @@
       }
     });
 
-    // Host starts round
     document.getElementById("host-form").addEventListener("submit", e => {
       e.preventDefault();
       question = document.getElementById("question-input").value.trim();
       correctAnswer = document.getElementById("answer-input").value.trim();
       if (!question || !correctAnswer) return alert("Please enter both question and correct answer.");
-      socket.emit("obviously_lies_start_round", { lobbyCode, question, correctAnswer });
-      // Hide host form after submission
-      document.getElementById("host-section").classList.add("hidden");
-      // Show question for all
-      document.getElementById("question-section").classList.remove("hidden");
-      document.getElementById("display-question").textContent = question;
-      // Show player submit section for others
-      if (!isHost) {
-        document.getElementById("player-submit-section").classList.remove("hidden");
-      }
+      socket.emit("obviously_lies_start_round", { lobbyCode, question, correctAnswer, username });
     });
 
-    // Player submits false answer
+    socket.on("obviously_lies_round_started", data => {
+      question = data.question || "";
+      document.getElementById("question-section").classList.remove("hidden");
+      document.getElementById("display-question").textContent = question;
+
+      if (isHost) {
+        document.getElementById("host-section").classList.add("hidden");
+      } else {
+        document.getElementById("player-submit-section").classList.remove("hidden");
+      }
+      document.getElementById("submit-status").textContent = "";
+      document.getElementById("false-answer-input").disabled = false;
+      document.querySelector("#false-answer-form button").disabled = false;
+      document.getElementById("submitted-answers-section").classList.remove("hidden");
+
+      // Clear any previous answers shown
+      document.getElementById("submitted-answers").innerHTML = "";
+    });
+
     document.getElementById("false-answer-form").addEventListener("submit", e => {
       e.preventDefault();
       const falseAnswer = document.getElementById("false-answer-input").value.trim();
       if (!falseAnswer) return alert("Please enter a false answer.");
       socket.emit("obviously_lies_submit_false_answer", { lobbyCode, player: username, falseAnswer });
-      document.getElementById("submit-status").textContent = "Submitted! Waiting for others...";
+      document.getElementById("submit-status").textContent = "Submitted!";
       document.getElementById("false-answer-input").value = "";
-      // Disable input after submitting
       document.getElementById("false-answer-input").disabled = true;
       e.target.querySelector("button").disabled = true;
     });
 
-    // Receive info to show all answers (including correct)
-    socket.on("obviously_lies_show_answers", data => {
-      document.getElementById("player-submit-section").classList.add("hidden");
-      document.getElementById("answers-section").classList.remove("hidden");
-      const answersList = document.getElementById("answers-list");
-      answersList.innerHTML = "";
-      data.answers.forEach((ans, idx) => {
-        const li = document.createElement("li");
-        li.textContent = ans;
-        answersList.appendChild(li);
-      });
-      // Show selection UI
-      document.getElementById("selection-section").classList.remove("hidden");
-      populateSelectionList(data.answers);
+    // Display submitted false answers anonymously (without player names)
+    socket.on("obviously_lies_false_answer_submitted", data => {
+      const answerContainer = document.createElement("div");
+      answerContainer.classList.add("answer-container");
+      answerContainer.textContent = data.falseAnswer; // Show only answer text
+      document.getElementById("submitted-answers").appendChild(answerContainer);
     });
 
-    function populateSelectionList(answers) {
-      const selectionList = document.getElementById("selection-list");
-      selectionList.innerHTML = "";
-      answers.forEach((ans, idx) => {
-        const li = document.createElement("li");
-        const btn = document.createElement("button");
-        btn.textContent = `Select: ${ans}`;
-        btn.addEventListener("click", () => {
-          socket.emit("obviously_lies_submit_selection", { lobbyCode, player: username, selectedAnswer: ans });
-          // Disable buttons after selection
-          Array.from(selectionList.querySelectorAll("button")).forEach(b => b.disabled = true);
-          document.getElementById("selection-status").textContent = "Selection submitted! Waiting for others...";
-        });
-        li.appendChild(btn);
-        selectionList.appendChild(li);
+    // When all answers (including correct one) are ready, display all anonymously
+    socket.on("obviously_lies_all_answers", data => {
+      const answersDiv = document.getElementById("submitted-answers");
+      answersDiv.innerHTML = ""; // Clear previous answers
+      data.answers.forEach(answer => {
+        const answerContainer = document.createElement("div");
+        answerContainer.classList.add("answer-container");
+        answerContainer.textContent = answer; // Show only answer text
+        answersDiv.appendChild(answerContainer);
       });
-    }
-
-    // Receive round results: scores for each player
-    socket.on("obviously_lies_round_results", data => {
-      document.getElementById("selection-section").classList.add("hidden");
-      document.getElementById("answers-section").classList.add("hidden");
-      const scoreSection = document.getElementById("score-section");
-      scoreSection.classList.remove("hidden");
-      const scoreList = document.getElementById("score-list");
-      scoreList.innerHTML = "";
-      for (const [player, score] of Object.entries(data.scores)) {
-        const li = document.createElement("li");
-        li.textContent = `${player}: ${score} point${score !== 1 ? "s" : ""}`;
-        scoreList.appendChild(li);
-      }
-    });
-
-    // Starting new round (host only)
-    document.getElementById("new-round-btn").addEventListener("click", () => {
-      if (!isHost) return alert("Only host can start new rounds.");
-      // Reset UI
-      document.getElementById("score-section").classList.add("hidden");
-      document.getElementById("host-section").classList.remove("hidden");
-      document.getElementById("question-input").value = "";
-      document.getElementById("answer-input").value = "";
     });
   </script>
 </body>
