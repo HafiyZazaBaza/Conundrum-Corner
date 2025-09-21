@@ -14,6 +14,7 @@
 
     button:disabled {
       opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .answer-container {
@@ -21,6 +22,50 @@
       padding: 10px;
       background-color: #f0f0f0;
       border-radius: 5px;
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Fix for the vote button alignment */
+    .vote-button {
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      background-color: #0052cc;
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      min-width: 80px;
+      transition: background-color 0.25s ease, transform 0.15s ease;
+    }
+
+    .vote-button:hover {
+      background-color: #003a88;
+      transform: translateY(-2px);
+    }
+
+    .vote-button:disabled {
+      cursor: default;
+      opacity: 0.6;
+      box-shadow: none;
+    }
+
+    #voted-players-section {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #e8f4ff;
+      border-radius: 5px;
+    }
+
+    #voted-players-section h3 {
+      margin-bottom: 10px;
+    }
+
+    .voted-player-info {
+      font-style: italic;
+      margin-bottom: 5px;
     }
   </style>
 </head>
@@ -46,7 +91,6 @@
     <div id="question-section" class="hidden">
       <h2>Question:</h2>
       <p id="display-question"></p>
-      <!-- Removed correct answer display -->
     </div>
 
     <!-- Player Area -->
@@ -65,6 +109,12 @@
       <div id="submitted-answers"></div>
     </div>
 
+    <!-- Players Who Have Voted Section -->
+    <div id="voted-players-section" class="hidden">
+      <h3>Players who have voted</h3>
+      <div id="voted-players-list"></div>
+    </div>
+
   </div>
 
   <script>
@@ -74,6 +124,8 @@
     let isHost = false;
     let question = "";
     let correctAnswer = "";
+    let hasVoted = false; // Track if the player already voted
+    let myFalseAnswers = new Set(); // Track player's own false answers
 
     socket.on("connect", () => {
       socket.emit("join_lobby", { username, lobbyCode });
@@ -90,7 +142,10 @@
       e.preventDefault();
       question = document.getElementById("question-input").value.trim();
       correctAnswer = document.getElementById("answer-input").value.trim();
-      if (!question || !correctAnswer) return alert("Please enter both question and correct answer.");
+      if (!question || !correctAnswer) {
+        alert("Please enter both question and correct answer.");
+        return;
+      }
       socket.emit("obviously_lies_start_round", { lobbyCode, question, correctAnswer, username });
     });
 
@@ -98,6 +153,9 @@
       question = data.question || "";
       document.getElementById("question-section").classList.remove("hidden");
       document.getElementById("display-question").textContent = question;
+
+      hasVoted = false; // Reset voting state for a new round
+      myFalseAnswers.clear(); // Reset player's own answers for new round
 
       if (isHost) {
         document.getElementById("host-section").classList.add("hidden");
@@ -108,41 +166,127 @@
       document.getElementById("false-answer-input").disabled = false;
       document.querySelector("#false-answer-form button").disabled = false;
       document.getElementById("submitted-answers-section").classList.remove("hidden");
+      document.getElementById("voted-players-section").classList.remove("hidden");
 
-      // Clear any previous answers shown
+      // Clear previously displayed answers and votes
       document.getElementById("submitted-answers").innerHTML = "";
+      document.getElementById("voted-players-list").innerHTML = "";
     });
 
     document.getElementById("false-answer-form").addEventListener("submit", e => {
       e.preventDefault();
       const falseAnswer = document.getElementById("false-answer-input").value.trim();
-      if (!falseAnswer) return alert("Please enter a false answer.");
+      if (!falseAnswer) {
+        alert("Please enter a false answer.");
+        return;
+      }
       socket.emit("obviously_lies_submit_false_answer", { lobbyCode, player: username, falseAnswer });
       document.getElementById("submit-status").textContent = "Submitted!";
       document.getElementById("false-answer-input").value = "";
       document.getElementById("false-answer-input").disabled = true;
       e.target.querySelector("button").disabled = true;
+      myFalseAnswers.add(falseAnswer); // Track player's own false answer
     });
 
-    // Display submitted false answers anonymously (without player names)
+    function createAnswerContainer(answer) {
+      const container = document.createElement("div");
+      container.classList.add("answer-container");
+      container.textContent = answer;
+
+      // Only create vote button if user is NOT the host and player has not voted
+      // Also do NOT create vote button if the answer belongs to the player
+      if (!isHost && !hasVoted && !myFalseAnswers.has(answer)) {
+        const voteBtn = document.createElement("button");
+        voteBtn.classList.add("vote-button");
+        voteBtn.textContent = "Vote";
+        voteBtn.disabled = false;
+
+        voteBtn.onclick = () => {
+          if (hasVoted) return; // Prevent multiple votes client-side
+          // Disable all vote buttons immediately to avoid race conditions
+          document.querySelectorAll(".vote-button").forEach(btn => btn.disabled = true);
+          socket.emit("obviously_lies_vote", { lobbyCode, player: username, answer });
+        };
+
+        container.appendChild(voteBtn);
+      } else if (hasVoted) {
+        // Show voted state for all answers after voting
+        const voteBtn = document.createElement("button");
+        voteBtn.classList.add("vote-button");
+        voteBtn.textContent = "Voted!";
+        voteBtn.disabled = true;
+        container.appendChild(voteBtn);
+      }
+
+      return container;
+    }
+
+    // Append newly submitted false answers anonymously
     socket.on("obviously_lies_false_answer_submitted", data => {
-      const answerContainer = document.createElement("div");
-      answerContainer.classList.add("answer-container");
-      answerContainer.textContent = data.falseAnswer; // Show only answer text
+      const answerContainer = createAnswerContainer(data.falseAnswer);
       document.getElementById("submitted-answers").appendChild(answerContainer);
     });
 
-    // When all answers (including correct one) are ready, display all anonymously
+    // Display all answers (including correct) with vote buttons when ready
     socket.on("obviously_lies_all_answers", data => {
+      hasVoted = false; // Reset voting state on new answers
+
       const answersDiv = document.getElementById("submitted-answers");
-      answersDiv.innerHTML = ""; // Clear previous answers
+      answersDiv.innerHTML = ""; // Clear old answers
+
       data.answers.forEach(answer => {
-        const answerContainer = document.createElement("div");
-        answerContainer.classList.add("answer-container");
-        answerContainer.textContent = answer; // Show only answer text
+        const answerContainer = createAnswerContainer(answer);
         answersDiv.appendChild(answerContainer);
       });
+
+      // Clear previous votes display on new answers
+      document.getElementById("voted-players-list").innerHTML = "";
     });
+
+    // Confirm successful vote from server, then disable all vote buttons
+    socket.on("vote_confirmed", data => {
+      if (data.player === username) {
+        hasVoted = true;
+        document.querySelectorAll(".vote-button").forEach(btn => {
+          btn.disabled = true;
+          btn.textContent = "Voted!";
+        });
+      }
+    });
+
+    // Show error if vote rejected (e.g. already voted)
+    socket.on("error_message", data => {
+      if (data.message === "Vote failed or already voted.") {
+        alert("You have already voted and cannot vote again.");
+        hasVoted = true; // Ensure UI stays disabled
+        document.querySelectorAll(".vote-button").forEach(btn => {
+          btn.disabled = true;
+          btn.textContent = "Voted!";
+        });
+      }
+    });
+
+    // New event to update votes display showing which players voted for which answers
+    socket.on("update_votes", data => {
+      const votes = data.votes; // object { player: answer }
+      const container = document.getElementById("voted-players-list");
+      container.innerHTML = ""; // Clear previous list
+
+      Object.entries(votes).forEach(([player, answer]) => {
+        const infoDiv = document.createElement("div");
+        infoDiv.classList.add("voted-player-info");
+
+        if (player === username) {
+          infoDiv.textContent = `you have voted for ${answer}`;
+        } else {
+          infoDiv.textContent = `${player} have voted for ${answer}`;
+        }
+
+        container.appendChild(infoDiv);
+      });
+    });
+
   </script>
 </body>
+
 </html>

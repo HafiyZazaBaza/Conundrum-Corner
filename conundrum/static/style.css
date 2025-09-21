@@ -6,6 +6,9 @@
     --text-dark: #222;
     --white: #ffffff;
     --card-border: 2px solid var(--accent);
+    --vote-button-bg: #0052cc;
+    --vote-button-hover-bg: #003a88;
+    --vote-button-voted-bg: #28a745; /* green for voted */
 }
 
 /* ---------- General Page ---------- */
@@ -13,7 +16,7 @@ body {
     font-family: Arial, Helvetica, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: var(--bg); /* main background */
+    background-color: var(--bg);
     color: var(--text-dark);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -48,9 +51,9 @@ h2 {
 }
 
 .form-box {
-    background-color: var(--card); /* form background */
+    background-color: var(--card);
     padding: 25px;
-    flex: 1; /* equal width for both boxes */
+    flex: 1;
     border-radius: 15px;
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
     text-align: left;
@@ -84,7 +87,7 @@ input:focus, select:focus {
 .form-box button {
     width: 100%;
     padding: 12px;
-    background-color: var(--accent); /* button background */
+    background-color: var(--accent);
     color: var(--white);
     font-size: 1rem;
     font-weight: bold;
@@ -121,7 +124,6 @@ button {
     border-radius: 8px;
 }
 
-/* small hover */
 button:hover, .small-btn:hover {
     background-color: var(--accent-dark);
     transform: translateY(-1px);
@@ -209,35 +211,12 @@ button:hover, .small-btn:hover {
     font-weight: 700;
 }
 
-.host-badge-inline {
-    display: inline-block;
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--white);
-    padding: 3px 8px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    margin-left: 8px;
-}
-
 /* Host control area */
 .host-controls {
     margin-top: 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-}
-
-.label-inline {
-    font-weight: 700;
-    font-size: 0.95rem;
-    color: var(--text-dark);
-}
-
-.select-control {
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid #cfcfcf;
-    font-size: 0.95rem;
 }
 
 /* Small host actions container */
@@ -295,13 +274,7 @@ button:hover, .small-btn:hover {
     box-sizing: border-box;
 }
 
-/* smaller send button */
-.chat-form .small-btn {
-    padding: 8px 12px;
-    min-width: 76px;
-}
-
-/* ---------- responsive ---------- */
+/* ---------- Responsive Layout ---------- */
 @media (max-width: 850px) {
     .lobby-grid {
         grid-template-columns: 1fr;
@@ -317,12 +290,12 @@ button:hover, .small-btn:hover {
     }
 }
 
-/* Obviously Lies Game Specific Styles */
-#host-section, 
-#question-section, 
-#player-submit-section, 
-#answers-section, 
-#selection-section, 
+/* Obviously Lies Game Styles */
+#host-section,
+#question-section,
+#player-submit-section,
+#answers-section,
+#selection-section,
 #score-section {
     background-color: var(--card);
     border: var(--card-border);
@@ -401,34 +374,40 @@ button:hover:not(:disabled) {
     border-radius: 6px;
 }
 
-#submit-status, #selection-status {
-    margin-top: 12px;
-    color: var(--accent-dark);
+/* Vote button */
+.vote-button {
+    background-color: var(--vote-button-bg);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
     font-weight: 600;
-    font-style: italic;
+    padding: 8px 16px;
+    cursor: pointer;
+    min-width: 80px;
+    transition: background-color 0.25s ease, transform 0.15s ease;
+    user-select: none;
+    box-shadow: 0 2px 6px rgba(0, 82, 204, 0.4);
 }
 
-#new-round-btn {
-    margin-top: 24px;
+.vote-button:hover:not(:disabled) {
+    background-color: var(--vote-button-hover-bg);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 58, 136, 0.6);
 }
 
-/* Disabled buttons for feedback */
-button:disabled {
+.vote-button:disabled {
     cursor: default;
     opacity: 0.6;
+    box-shadow: none;
 }
 
-/* Responsive tweaks */
-@media (max-width: 600px) {
-    button {
-        width: 100%;
-        min-width: unset;
-    }
-    .answer-list li {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 6px;
-    }
+/* Voted state */
+.vote-button.voted {
+    background-color: var(--vote-button-voted-bg);
+    cursor: default;
+    transform: none;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.7);
 }
 
 /* Submitted False Answers Live Display */
@@ -438,7 +417,7 @@ button:disabled {
     overflow-y: auto;
     font-style: italic;
     border: var(--card-border);
-    background-color: #fefefe; /* slightly lighter neutral background */
+    background-color: #fefefe;
     padding: 14px 18px;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -449,4 +428,33 @@ button:disabled {
     margin-bottom: 10px;
     font-size: 1rem;
     word-break: break-word;
+}
+
+/* Obviously Lies Submitted Answers container */
+.answer-container {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background-color: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: var(--card-border);
+    position: relative;
+    font-size: 1.1rem;
+    color: var(--text-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Responsive tweaks */
+@media (max-width: 600px) {
+    .answer-container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .vote-button {
+        width: 100%;
+        min-width: unset;
+    }
 }
