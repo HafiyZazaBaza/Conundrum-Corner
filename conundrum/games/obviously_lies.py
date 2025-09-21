@@ -1,11 +1,14 @@
 # conundrum/games/obviously_lies.py
 
+
 class ObviouslyLiesGame:
     def __init__(self):
         # Stores game state keyed by lobby_code
         self.games = {}
 
-    def start_round(self, lobby_code, question, correct_answer, players):
+    def start_round(self, lobby_code, question, correct_answer, players, host=None):
+        # Exclude host from players eligible for scoring
+        eligible_players = set(players) - {host} if host else set(players)
         self.games[lobby_code] = {
             "question": question,
             "correct_answer": correct_answer,
@@ -14,6 +17,8 @@ class ObviouslyLiesGame:
             "finished_submitting": set(),
             "votes": {correct_answer: set()},  # answer -> set of players who voted for it
             "answer_to_player": {correct_answer: None},  # answer -> player who submitted (None for correct answer)
+            "scores": {player: 0 for player in eligible_players},  # only non-host players score
+            "host": host,  # remember the host
         }
 
     def submit_false_answer(self, lobby_code, player, false_answer):
@@ -59,6 +64,9 @@ class ObviouslyLiesGame:
             return False
         if player not in game["players"]:
             return False
+        # Host cannot vote
+        if player == game.get("host"):
+            return False
         # Player can only vote once per round
         for voters in game["votes"].values():
             if player in voters:
@@ -72,6 +80,15 @@ class ObviouslyLiesGame:
             return False
         # Cast the vote
         game["votes"][answer].add(player)
+
+        # Update scores:
+        # If voted a false answer, owner of false answer gets a point (if not host)
+        if answer_owner is not None and answer_owner != game.get("host"):
+            game["scores"][answer_owner] += 1
+        # If voted the correct answer, voter gets a point (if not host)
+        if answer == game["correct_answer"] and player != game.get("host"):
+            game["scores"][player] += 1
+
         return True
 
     def has_player_voted(self, lobby_code, player):
@@ -88,6 +105,12 @@ class ObviouslyLiesGame:
         if not game:
             return {}
         return game.get("false_answers", {})
+
+    def get_scores(self, lobby_code):
+        game = self.games.get(lobby_code)
+        if not game:
+            return {}
+        return game.get("scores", {})
 
     def end_round(self, lobby_code):
         if lobby_code in self.games:

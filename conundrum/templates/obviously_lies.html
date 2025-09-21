@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Obviously Lies - Lobby {{ lobby_code }}</title>
+  <title>Obviously Lies 🤥</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <style>
@@ -17,46 +17,60 @@
       cursor: not-allowed;
     }
 
+    #submitted-answers-section {
+      background-color: #d9d9d9;
+      border-radius: 20px;
+      padding: 15px;
+      margin-top: 24px;
+      box-shadow: none;
+    }
+
     .answer-container {
-      margin-top: 10px;
-      padding: 10px;
-      background-color: #f0f0f0;
-      border-radius: 5px;
-      position: relative;
+      background-color: white;
+      color: black;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      padding: 12px 20px;
+      box-shadow: none;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      font-size: 1.1rem;
+      font-weight: normal;
     }
 
-    /* Fix for the vote button alignment */
     .vote-button {
-      padding: 8px 16px;
-      font-size: 0.9rem;
-      background-color: #0052cc;
-      color: #ffffff;
-      border: none;
-      border-radius: 5px;
+      border-radius: 8px;
+      background-color: #002b66;
+      color: white;
+      padding: 6px 16px;
+      font-weight: 600;
       cursor: pointer;
       min-width: 80px;
       transition: background-color 0.25s ease, transform 0.15s ease;
+      border: none;
     }
 
-    .vote-button:hover {
-      background-color: #003a88;
+    .vote-button:hover:not(:disabled) {
+      background-color: #001f4d;
       transform: translateY(-2px);
     }
 
     .vote-button:disabled {
+      background-color: #001f4d;
       cursor: default;
-      opacity: 0.6;
+      opacity: 0.7;
       box-shadow: none;
+      transform: none;
     }
 
     #voted-players-section {
-      margin-top: 20px;
-      padding: 10px;
-      background-color: #e8f4ff;
-      border-radius: 5px;
+      background-color: #9ea9c4;
+      border-radius: 20px;
+      padding: 15px;
+      margin-top: 24px;
+      box-shadow: none;
+      color: black;
     }
 
     #voted-players-section h3 {
@@ -66,6 +80,35 @@
     .voted-player-info {
       font-style: italic;
       margin-bottom: 5px;
+    }
+
+    #scores-section {
+      background-color: white;
+      border-radius: 20px;
+      padding: 15px 20px;
+      margin-top: 24px;
+      box-shadow: none;
+      color: black;
+      font-weight: 700;
+    }
+
+    #scores-section h3 {
+      margin-bottom: 10px;
+    }
+
+    #scores-list {
+      list-style-type: none;
+      padding-left: 0;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    #scores-list li {
+      margin-bottom: 6px;
+    }
+
+    #scores-list li[style] {
+      color: #002b66;
     }
   </style>
 </head>
@@ -115,6 +158,11 @@
       <div id="voted-players-list"></div>
     </div>
 
+    <!-- Scores Section -->
+    <div id="scores-section" class="hidden">
+      <h3>Scores</h3>
+      <ul id="scores-list"></ul>
+    </div>
   </div>
 
   <script>
@@ -124,8 +172,8 @@
     let isHost = false;
     let question = "";
     let correctAnswer = "";
-    let hasVoted = false; // Track if the player already voted
-    let myFalseAnswers = new Set(); // Track player's own false answers
+    let hasVoted = false;
+    let myFalseAnswers = new Set();
 
     socket.on("connect", () => {
       socket.emit("join_lobby", { username, lobbyCode });
@@ -154,8 +202,8 @@
       document.getElementById("question-section").classList.remove("hidden");
       document.getElementById("display-question").textContent = question;
 
-      hasVoted = false; // Reset voting state for a new round
-      myFalseAnswers.clear(); // Reset player's own answers for new round
+      hasVoted = false;
+      myFalseAnswers.clear();
 
       if (isHost) {
         document.getElementById("host-section").classList.add("hidden");
@@ -167,10 +215,11 @@
       document.querySelector("#false-answer-form button").disabled = false;
       document.getElementById("submitted-answers-section").classList.remove("hidden");
       document.getElementById("voted-players-section").classList.remove("hidden");
+      document.getElementById("scores-section").classList.remove("hidden");
 
-      // Clear previously displayed answers and votes
       document.getElementById("submitted-answers").innerHTML = "";
       document.getElementById("voted-players-list").innerHTML = "";
+      document.getElementById("scores-list").innerHTML = "";
     });
 
     document.getElementById("false-answer-form").addEventListener("submit", e => {
@@ -185,7 +234,7 @@
       document.getElementById("false-answer-input").value = "";
       document.getElementById("false-answer-input").disabled = true;
       e.target.querySelector("button").disabled = true;
-      myFalseAnswers.add(falseAnswer); // Track player's own false answer
+      myFalseAnswers.add(falseAnswer);
     });
 
     function createAnswerContainer(answer) {
@@ -193,8 +242,6 @@
       container.classList.add("answer-container");
       container.textContent = answer;
 
-      // Only create vote button if user is NOT the host and player has not voted
-      // Also do NOT create vote button if the answer belongs to the player
       if (!isHost && !hasVoted && !myFalseAnswers.has(answer)) {
         const voteBtn = document.createElement("button");
         voteBtn.classList.add("vote-button");
@@ -202,15 +249,13 @@
         voteBtn.disabled = false;
 
         voteBtn.onclick = () => {
-          if (hasVoted) return; // Prevent multiple votes client-side
-          // Disable all vote buttons immediately to avoid race conditions
+          if (hasVoted) return;
           document.querySelectorAll(".vote-button").forEach(btn => btn.disabled = true);
           socket.emit("obviously_lies_vote", { lobbyCode, player: username, answer });
         };
 
         container.appendChild(voteBtn);
       } else if (hasVoted) {
-        // Show voted state for all answers after voting
         const voteBtn = document.createElement("button");
         voteBtn.classList.add("vote-button");
         voteBtn.textContent = "Voted!";
@@ -221,29 +266,22 @@
       return container;
     }
 
-    // Append newly submitted false answers anonymously
     socket.on("obviously_lies_false_answer_submitted", data => {
       const answerContainer = createAnswerContainer(data.falseAnswer);
       document.getElementById("submitted-answers").appendChild(answerContainer);
     });
 
-    // Display all answers (including correct) with vote buttons when ready
     socket.on("obviously_lies_all_answers", data => {
-      hasVoted = false; // Reset voting state on new answers
-
+      hasVoted = false;
       const answersDiv = document.getElementById("submitted-answers");
-      answersDiv.innerHTML = ""; // Clear old answers
-
+      answersDiv.innerHTML = "";
       data.answers.forEach(answer => {
         const answerContainer = createAnswerContainer(answer);
         answersDiv.appendChild(answerContainer);
       });
-
-      // Clear previous votes display on new answers
       document.getElementById("voted-players-list").innerHTML = "";
     });
 
-    // Confirm successful vote from server, then disable all vote buttons
     socket.on("vote_confirmed", data => {
       if (data.player === username) {
         hasVoted = true;
@@ -254,11 +292,10 @@
       }
     });
 
-    // Show error if vote rejected (e.g. already voted)
     socket.on("error_message", data => {
       if (data.message === "Vote failed or already voted.") {
         alert("You have already voted and cannot vote again.");
-        hasVoted = true; // Ensure UI stays disabled
+        hasVoted = true;
         document.querySelectorAll(".vote-button").forEach(btn => {
           btn.disabled = true;
           btn.textContent = "Voted!";
@@ -266,26 +303,36 @@
       }
     });
 
-    // New event to update votes display showing which players voted for which answers
     socket.on("update_votes", data => {
-      const votes = data.votes; // object { player: answer }
+      const votes = data.votes;
       const container = document.getElementById("voted-players-list");
-      container.innerHTML = ""; // Clear previous list
-
+      container.innerHTML = "";
       Object.entries(votes).forEach(([player, answer]) => {
         const infoDiv = document.createElement("div");
         infoDiv.classList.add("voted-player-info");
-
         if (player === username) {
           infoDiv.textContent = `you have voted for ${answer}`;
         } else {
           infoDiv.textContent = `${player} have voted for ${answer}`;
         }
-
         container.appendChild(infoDiv);
       });
     });
 
+    socket.on("update_scores", data => {
+      const scores = data.scores;
+      const scoresList = document.getElementById("scores-list");
+      scoresList.innerHTML = "";
+      Object.entries(scores).forEach(([player, score]) => {
+        const li = document.createElement("li");
+        li.textContent = `${player}: ${score} point${score !== 1 ? "s" : ""}`;
+        if (player === username) {
+          li.style.fontWeight = "bold";
+          li.style.color = "#002b66";
+        }
+        scoresList.appendChild(li);
+      });
+    });
   </script>
 </body>
 

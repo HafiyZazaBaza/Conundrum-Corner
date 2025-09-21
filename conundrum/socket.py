@@ -3,8 +3,8 @@ from flask import request
 from . import socketio
 import random
 import string
-import random
 from conundrum.games.obviously_lies import ObviouslyLiesGame
+
 
 # Lobby state: lobby_code -> lobby data
 lobbies = {}
@@ -15,11 +15,13 @@ obviously_lies_game_manager = ObviouslyLiesGame()
 # Track votes per lobby: { lobby_code: { player: answer, ... }, ... }
 lobby_votes = {}
 
+
 def generate_lobby_code():
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
 
 
 # --- Lobby management ---
+
 
 @socketio.on("create_lobby")
 def handle_create_lobby(data):
@@ -159,7 +161,8 @@ def obviously_lies_start_round(data):
         return
 
     players = set(lobby["players"])
-    obviously_lies_game_manager.start_round(lobby_code, question, correct_answer, players)
+    host = lobby["host"]
+    obviously_lies_game_manager.start_round(lobby_code, question, correct_answer, players, host)
 
     # Reset votes for new round
     lobby_votes[lobby_code] = {}
@@ -219,6 +222,11 @@ def obviously_lies_vote(data):
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
         return
 
+    # Prevent host from voting
+    if player == lobbies[lobby_code]["host"]:
+        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
+        return
+
     success = obviously_lies_game_manager.cast_vote(lobby_code, player, answer)
     if success:
         # Record the vote for broadcasting
@@ -227,5 +235,8 @@ def obviously_lies_vote(data):
         emit("vote_confirmed", {"answer": answer, "player": player}, room=request.sid)
         # Broadcast updated votes to all players in the lobby
         emit("update_votes", {"votes": current_votes}, room=lobby_code)
+        # Broadcast updated scores to all players in the lobby
+        scores = obviously_lies_game_manager.get_scores(lobby_code)
+        emit("update_scores", {"scores": scores}, room=lobby_code)
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
