@@ -3,6 +3,7 @@ from flask import request
 from . import socketio
 import random
 import string
+import random
 from conundrum.games.obviously_lies import ObviouslyLiesGame
 
 # Lobby state: lobby_code -> lobby data
@@ -11,8 +12,12 @@ lobbies = {}
 # Obviously Lies game manager instance
 obviously_lies_game_manager = ObviouslyLiesGame()
 
+# Track votes per lobby: { lobby_code: { player: answer, ... }, ... }
+lobby_votes = {}
+
 def generate_lobby_code():
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+
 
 # --- Lobby management ---
 
@@ -53,6 +58,7 @@ def handle_create_lobby(data):
         room=lobby_code,
     )
 
+
 @socketio.on("join_lobby")
 def handle_join_lobby(data):
     username = data.get("username")
@@ -88,6 +94,7 @@ def handle_join_lobby(data):
         room=lobby_code,
     )
 
+
 @socketio.on("send_message")
 def handle_send_message(data):
     lobby_code = data.get("lobbyCode")
@@ -99,6 +106,7 @@ def handle_send_message(data):
         return
 
     emit("receive_message", {"username": username, "message": message}, room=lobby_code)
+
 
 @socketio.on("start_game")
 def handle_start_game(data):
@@ -123,11 +131,13 @@ def handle_start_game(data):
 
     if mode == "obviously_lies":
         obviously_lies_game_manager.end_round(lobby_code)  # Clear existing if any
+        lobby_votes[lobby_code] = {}  # Reset votes when game starts
 
     emit("game_started", {"lobbyCode": lobby_code, "mode": mode}, room=lobby_code)
 
 
 # --- Obviously Lies game handlers ---
+
 
 @socketio.on("obviously_lies_start_round")
 def obviously_lies_start_round(data):
@@ -151,11 +161,15 @@ def obviously_lies_start_round(data):
     players = set(lobby["players"])
     obviously_lies_game_manager.start_round(lobby_code, question, correct_answer, players)
 
+    # Reset votes for new round
+    lobby_votes[lobby_code] = {}
+
     # Broadcast question to all players (without correct answer)
     emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
 
     # Immediately emit the correct answer as part of the anonymous answers list
     emit("obviously_lies_all_answers", {"answers": [correct_answer]}, room=lobby_code)
+
 
 @socketio.on("obviously_lies_submit_false_answer")
 def obviously_lies_submit_false_answer(data):
@@ -199,9 +213,19 @@ def obviously_lies_vote(data):
         emit("error_message", {"message": "Round not started."}, room=request.sid)
         return
 
-    success = obviously_lies_game_manager.cast_vote(lobby_code, player, answer)
+    # Track vote only if this player has not voted yet
+    current_votes = lobby_votes.setdefault(lobby_code, {})
+    if player in current_votes:
+        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+        return
 
+    success = obviously_lies_game_manager.cast_vote(lobby_code, player, answer)
     if success:
+        # Record the vote for broadcasting
+        current_votes[player] = answer
+        # Confirm vote to voting player
         emit("vote_confirmed", {"answer": answer, "player": player}, room=request.sid)
+        # Broadcast updated votes to all players in the lobby
+        emit("update_votes", {"votes": current_votes}, room=lobby_code)
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)

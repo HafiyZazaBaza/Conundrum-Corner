@@ -51,6 +51,22 @@
       opacity: 0.6;
       box-shadow: none;
     }
+
+    #voted-players-section {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #e8f4ff;
+      border-radius: 5px;
+    }
+
+    #voted-players-section h3 {
+      margin-bottom: 10px;
+    }
+
+    .voted-player-info {
+      font-style: italic;
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 
@@ -92,6 +108,13 @@
       <h3>Submitted Answers</h3>
       <div id="submitted-answers"></div>
     </div>
+
+    <!-- Players Who Have Voted Section -->
+    <div id="voted-players-section" class="hidden">
+      <h3>Players who have voted</h3>
+      <div id="voted-players-list"></div>
+    </div>
+
   </div>
 
   <script>
@@ -143,9 +166,11 @@
       document.getElementById("false-answer-input").disabled = false;
       document.querySelector("#false-answer-form button").disabled = false;
       document.getElementById("submitted-answers-section").classList.remove("hidden");
+      document.getElementById("voted-players-section").classList.remove("hidden");
 
-      // Clear previously displayed answers
+      // Clear previously displayed answers and votes
       document.getElementById("submitted-answers").innerHTML = "";
+      document.getElementById("voted-players-list").innerHTML = "";
     });
 
     document.getElementById("false-answer-form").addEventListener("submit", e => {
@@ -213,6 +238,9 @@
         const answerContainer = createAnswerContainer(answer);
         answersDiv.appendChild(answerContainer);
       });
+
+      // Clear previous votes display on new answers
+      document.getElementById("voted-players-list").innerHTML = "";
     });
 
     // Confirm successful vote from server, then disable all vote buttons
@@ -237,6 +265,28 @@
         });
       }
     });
+
+    // New event to update votes display showing which players voted for which answers
+    socket.on("update_votes", data => {
+      const votes = data.votes; // object { player: answer }
+      const container = document.getElementById("voted-players-list");
+      container.innerHTML = ""; // Clear previous list
+
+      Object.entries(votes).forEach(([player, answer]) => {
+        const infoDiv = document.createElement("div");
+        infoDiv.classList.add("voted-player-info");
+
+        if (player === username) {
+          infoDiv.textContent = `you have voted for ${answer}`;
+        } else {
+          infoDiv.textContent = `${player} have voted for ${answer}`;
+        }
+
+        container.appendChild(infoDiv);
+      });
+    });
+
   </script>
 </body>
+
 </html>
