@@ -4,7 +4,7 @@ from . import socketio
 import random
 import string
 from conundrum.games.obviously_lies import ObviouslyLiesGame
-
+from conundrum.utils.profanity_filter import ProfanityFilter
 
 # Lobby state: lobby_code -> lobby data
 lobbies = {}
@@ -14,6 +14,9 @@ obviously_lies_game_manager = ObviouslyLiesGame()
 
 # Track votes per lobby: { lobby_code: { player: answer, ... }, ... }
 lobby_votes = {}
+
+# Global profanity filter (load from JSON if exists)
+pf = ProfanityFilter.from_json("data/profanity.json")
 
 
 def generate_lobby_code():
@@ -107,7 +110,14 @@ def handle_send_message(data):
         emit("error_message", {"message": "Invalid message."}, room=request.sid)
         return
 
-    emit("receive_message", {"username": username, "message": message}, room=lobby_code)
+    # Run message through profanity filter
+    censored, violations = pf.clean(message)
+
+    emit(
+        "receive_message",
+        {"username": username, "message": censored, "violations": violations},
+        room=lobby_code,
+    )
 
 
 @socketio.on("start_game")
@@ -162,7 +172,9 @@ def obviously_lies_start_round(data):
 
     players = set(lobby["players"])
     host = lobby["host"]
-    obviously_lies_game_manager.start_round(lobby_code, question, correct_answer, players, host)
+    obviously_lies_game_manager.start_round(
+        lobby_code, question, correct_answer, players, host
+    )
 
     # Reset votes for new round
     lobby_votes[lobby_code] = {}
@@ -184,17 +196,26 @@ def obviously_lies_submit_false_answer(data):
         emit("error_message", {"message": "Round not found."}, room=request.sid)
         return
 
-    success = obviously_lies_game_manager.submit_false_answer(lobby_code, player, false_answer)
+    # Run through profanity filter
+    censored, violations = pf.clean(false_answer)
+
+    success = obviously_lies_game_manager.submit_false_answer(lobby_code, player, censored)
     if not success:
         emit("error_message", {"message": "Failed to submit false answer."}, room=request.sid)
         return
 
-    # Emit newly submitted false answer anonymously (without player names)
-    emit("obviously_lies_false_answer_submitted", {"falseAnswer": false_answer}, room=lobby_code)
+    emit(
+        "obviously_lies_false_answer_submitted",
+        {"falseAnswer": censored, "violations": violations},
+        room=lobby_code,
+    )
 
-    # Emit the player's own submitted answers as a list for UI to hide vote button on them
     player_answers = obviously_lies_game_manager.get_submitted_false_answers(lobby_code)
-    emit("player_own_answers", {"answers": [answer for p, answer in player_answers.items() if p == player]}, room=request.sid)
+    emit(
+        "player_own_answers",
+        {"answers": [answer for p, answer in player_answers.items() if p == player]},
+        room=request.sid,
+    )
 
     if obviously_lies_game_manager.all_false_submitted(lobby_code):
         all_answers = obviously_lies_game_manager.get_all_answers(lobby_code)
@@ -216,26 +237,20 @@ def obviously_lies_vote(data):
         emit("error_message", {"message": "Round not started."}, room=request.sid)
         return
 
-    # Track vote only if this player has not voted yet
     current_votes = lobby_votes.setdefault(lobby_code, {})
     if player in current_votes:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
         return
 
-    # Prevent host from voting
     if player == lobbies[lobby_code]["host"]:
         emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
         return
 
     success = obviously_lies_game_manager.cast_vote(lobby_code, player, answer)
     if success:
-        # Record the vote for broadcasting
         current_votes[player] = answer
-        # Confirm vote to voting player
         emit("vote_confirmed", {"answer": answer, "player": player}, room=request.sid)
-        # Broadcast updated votes to all players in the lobby
         emit("update_votes", {"votes": current_votes}, room=lobby_code)
-        # Broadcast updated scores to all players in the lobby
         scores = obviously_lies_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
     else:

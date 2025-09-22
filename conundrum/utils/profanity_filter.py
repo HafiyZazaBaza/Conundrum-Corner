@@ -3,12 +3,13 @@ import re
 import json
 import os
 
-# Default fallback rules (if JSON not found)
+# Default fallback rules
 DEFAULT_RULES = [
     {"id": "default-1", "match": "fuck", "severity": 3, "tags": ["swear"], "partial_match": "true"},
     {"id": "default-2", "match": "shit", "severity": 3, "tags": ["swear"], "partial_match": "true"},
     {"id": "default-3", "match": "bitch", "severity": 2, "tags": ["insult"], "partial_match": "true"},
 ]
+
 
 def _wildcard_to_regex(s: str) -> str:
     """Turn simple patterns using '*' and '|' into regex."""
@@ -19,6 +20,7 @@ def _wildcard_to_regex(s: str) -> str:
     esc = esc.replace(r"\|", "|")
     esc = esc.replace(r"\*", ".*")
     return esc
+
 
 class ProfanityFilter:
     """Profanity filter with JSON-configurable rules."""
@@ -67,8 +69,9 @@ class ProfanityFilter:
     def check(self, text):
         """Return list of violations in text."""
         violations = []
+        text = text or ""
         for rule, cre, ex_list in self.compiled:
-            m = cre.search(text or "")
+            m = cre.search(text)
             if not m:
                 continue
             if any(ex.search(text) for ex in ex_list):
