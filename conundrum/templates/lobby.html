@@ -26,7 +26,7 @@
       <section class="card players-card">
         <div class="card-header">
           <strong>Players</strong>
-          <span class="player-count" id="player-count">({{ '1' if is_host else '0' }})</span>
+          <span class="player-count" id="player-count">({{ lobby_data.get("players_count", 0) if lobby_data else '0' }})</span>
         </div>
 
         <ul id="users" class="players-list" aria-live="polite" style="margin-top:8px; padding-left:18px;"></ul>
@@ -41,12 +41,24 @@
               <option value="obviously_lies">Obviously Lies</option>
           </select>
 
-          <div class="host-actions">
+          <label for="max_rounds" class="label-inline" style="margin-top:8px;">Max rounds</label>
+          <input id="max_rounds" type="number" min="1" value="{{ lobby_data.max_rounds if lobby_data and lobby_data.max_rounds else 5 }}" class="small-input" />
+
+          <div class="host-actions" style="margin-top:8px;">
             <button id="start-btn" class="small-btn">Start Game</button>
+          </div>
+
+          <!-- Next round control appears while game is active -->
+          <div id="round-controls" style="margin-top:10px; display:none;">
+            <div>Round: <span id="current-round">0</span> / <span id="max-rounds">0</span></div>
+            <button id="next-round-btn" class="small-btn">Next Round</button>
           </div>
         </div>
         {% else %}
           <div class="waiting-note">Waiting for host to start the game…</div>
+          <div id="round-info" style="margin-top:8px; display:none;">
+            Round: <span id="current-round-public">0</span> / <span id="max-rounds-public">0</span>
+          </div>
         {% endif %}
       </section>
 
@@ -106,10 +118,53 @@
   // Errors
   socket.on("error_message", data => alert(data.message || "Error"));
 
-  // When game starts → redirect to play (server sends mode)
+  // When game starts → redirect to play (server sends mode + round info)
   socket.on("game_started", data => {
+    // ensure lobby UI shows round controls for host
+    const maxRoundsSpan = document.getElementById("max-rounds");
+    const currentRoundSpan = document.getElementById("current-round");
+    const maxRoundsPub = document.getElementById("max-rounds-public");
+    const currentRoundPub = document.getElementById("current-round-public");
+
+    if (data.max_rounds) {
+      if (maxRoundsSpan) maxRoundsSpan.textContent = data.max_rounds;
+      if (maxRoundsPub) maxRoundsPub.textContent = data.max_rounds;
+    }
+    if (data.current_round) {
+      if (currentRoundSpan) currentRoundSpan.textContent = data.current_round;
+      if (currentRoundPub) currentRoundPub.textContent = data.current_round;
+    }
+
+    // show controls
+    const rc = document.getElementById("round-controls");
+    if (rc) rc.style.display = "block";
+    const rip = document.getElementById("round-info");
+    if (rip) rip.style.display = "block";
+
+    // then redirect to the game page
     const target = `/games/play?lobby=${encodeURIComponent(lobbyCode)}&username=${encodeURIComponent(username)}&mode=${encodeURIComponent(data.mode)}`;
     window.location.href = target;
+  });
+
+  // Round updated
+  socket.on("round_updated", data => {
+    const currentRoundSpan = document.getElementById("current-round");
+    const maxRoundsSpan = document.getElementById("max-rounds");
+    const currentRoundPub = document.getElementById("current-round-public");
+    const maxRoundsPub = document.getElementById("max-rounds-public");
+
+    if (currentRoundSpan) currentRoundSpan.textContent = data.current_round;
+    if (maxRoundsSpan) maxRoundsSpan.textContent = data.max_rounds;
+    if (currentRoundPub) currentRoundPub.textContent = data.current_round;
+    if (maxRoundsPub) maxRoundsPub.textContent = data.max_rounds;
+  });
+
+  // Game over
+  socket.on("game_over", data => {
+    alert("Game over! Final round: " + (data.final_round || ""));
+    // hide controls
+    const rc = document.getElementById("round-controls");
+    if (rc) rc.style.display = "none";
   });
 
   // Send chat
@@ -129,7 +184,19 @@
     startBtn.addEventListener("click", () => {
       startBtn.disabled = true;
       const selectedMode = document.getElementById("game_mode").value;
-      socket.emit("start_game", { lobbyCode, username, mode: selectedMode });
+      const maxRounds = parseInt(document.getElementById("max_rounds").value || "5", 10);
+      socket.emit("start_game", { lobbyCode, username, mode: selectedMode, maxRounds });
+    });
+  }
+
+  // Next round (host only)
+  const nextBtn = document.getElementById("next-round-btn");
+  if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+      nextBtn.disabled = true;
+      socket.emit("next_round", { lobbyCode, username });
+      // re-enable after a short debounce so host can't spam
+      setTimeout(() => nextBtn.disabled = false, 600);
     });
   }
 
