@@ -5,22 +5,20 @@ import random
 import string
 from conundrum.games.obviously_lies import ObviouslyLiesGame
 from conundrum.games.reverse_guessing import ReverseGuessingGame
+from conundrum.games.bad_advice_hotline import BadAdviceHotlineGame
 from conundrum.utils.profanity_filter import ProfanityFilter
 from conundrum.utils.round_manager import round_manager
-
 
 # Lobby state: lobby_code -> lobby data
 lobbies = {}
 
-
 # Game manager instances
 obviously_lies_game_manager = ObviouslyLiesGame()
 reverse_guessing_game_manager = ReverseGuessingGame()
-
+bad_advice_hotline_game_manager = BadAdviceHotlineGame()
 
 # Track votes per lobby: { lobby_code: { player: choice, ... }, ... }
 lobby_votes = {}
-
 
 # Global profanity filter (load from JSON if exists)
 pf = ProfanityFilter.from_json("data/profanity.json")
@@ -59,8 +57,6 @@ def handle_create_lobby(data):
     max_rounds = int(data.get("maxRounds", 3))  # default 3 rounds
 
     round_manager.register_lobby(lobby_code, max_rounds=max_rounds)
-
-    # Register handlers depending on game mode will be done on game start
 
     join_room(lobby_code)
 
@@ -141,21 +137,130 @@ def handle_start_game(data):
 
     lobby_votes[lobby_code] = {}
 
+    # Setup round handler callbacks based on mode
     if mode == "obviously_lies":
         obviously_lies_game_manager.end_round(lobby_code)
-        round_manager.set_handler(lobby_code, {
-            "on_round_end": lambda lc, rn: obviously_lies_game_manager.end_round(lc),
-            "reset_round": lambda lc: obviously_lies_game_manager.reset_round_state(lc),
-        })
+        round_manager.set_handler(
+            lobby_code,
+            {
+                "on_round_end": lambda lc, rn: obviously_lies_game_manager.end_round(lc),
+                "reset_round": lambda lc: obviously_lies_game_manager.reset_round_state(lc),
+            },
+        )
 
     elif mode == "reverse_guessing":
         reverse_guessing_game_manager.end_round(lobby_code)
-        round_manager.set_handler(lobby_code, {
-            "on_round_end": lambda lc, rn: reverse_guessing_game_manager.end_round(lc),
-            "reset_round": lambda lc: reverse_guessing_game_manager.reset_round_state(lc),
-        })
+        round_manager.set_handler(
+            lobby_code,
+            {
+                "on_round_end": lambda lc, rn: reverse_guessing_game_manager.end_round(lc),
+                "reset_round": lambda lc: reverse_guessing_game_manager.reset_round_state(lc),
+            },
+        )
+
+    elif mode == "bad_advice_hotline":
+        bad_advice_hotline_game_manager.end_round(lobby_code)
+        round_manager.set_handler(
+            lobby_code,
+            {
+                "on_round_end": lambda lc, rn: bad_advice_hotline_game_manager.end_round(lc),
+                "reset_round": lambda lc: bad_advice_hotline_game_manager.reset_round_state(lc),
+            },
+        )
 
     emit("game_started", {"lobbyCode": lobby_code, "mode": mode}, room=lobby_code)
+
+
+# --- Bad Advice Hotline Handlers ---
+
+
+@socketio.on("bad_advice_hotline_start_round")
+def bad_advice_hotline_start_round(data):
+    lobby_code = data.get("lobbyCode")
+    question = data.get("question")
+    username = data.get("username")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+    if not question:
+        emit("error_message", {"message": "Question is required."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the round."}, room=request.sid)
+        return
+
+    players = set(lobby["players"])
+    host = lobby["host"]
+
+    bad_advice_hotline_game_manager.start_round(lobby_code, question, players, host)
+
+    lobby_votes[lobby_code] = {}
+
+    emit("bad_advice_hotline_round_started", {"question": question}, room=lobby_code)
+    emit("bad_advice_hotline_all_answers", {"answers": []}, room=lobby_code)
+
+
+@socketio.on("bad_advice_hotline_submit_bad_advice")
+def bad_advice_hotline_submit_bad_advice(data):
+    lobby_code = data.get("lobbyCode")
+    player = data.get("player")
+    bad_advice = data.get("badAdvice")
+
+    if not lobby_code or bad_advice is None or not bad_advice_hotline_game_manager.games.get(lobby_code):
+        emit("error_message", {"message": "Round not found or bad advice missing."}, room=request.sid)
+        return
+
+    censored, violations = pf.clean(bad_advice)
+
+    success = bad_advice_hotline_game_manager.submit_bad_advice(lobby_code, player, censored)
+    if not success:
+        emit("error_message", {"message": "Failed to submit bad advice."}, room=request.sid)
+        return
+
+    emit("bad_advice_hotline_bad_advice_submitted", {"badAdvice": censored, "violations": violations}, room=lobby_code)
+
+    player_answers = bad_advice_hotline_game_manager.get_submitted_bad_advice(lobby_code)
+    emit("player_own_answers", {"answers": [ans for p, ans in player_answers.items() if p == player]}, room=request.sid)
+
+    if bad_advice_hotline_game_manager.all_bad_advice_submitted(lobby_code):
+        all_answers = bad_advice_hotline_game_manager.get_all_bad_advice_answers(lobby_code)
+        random.shuffle(all_answers)
+        emit("bad_advice_hotline_all_answers", {"answers": all_answers}, room=lobby_code)
+
+
+@socketio.on("bad_advice_hotline_vote")
+def bad_advice_hotline_vote(data):
+    lobby_code = data.get("lobbyCode")
+    player = data.get("player")
+    answer = data.get("answer")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+    if not bad_advice_hotline_game_manager.games.get(lobby_code):
+        emit("error_message", {"message": "Round not started."}, room=request.sid)
+        return
+
+    current_votes = lobby_votes.setdefault(lobby_code, {})
+    if player in current_votes:
+        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+        return
+    if player == lobbies[lobby_code]["host"]:
+        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
+        return
+
+    success = bad_advice_hotline_game_manager.cast_vote(lobby_code, player, answer)
+    if success:
+        current_votes[player] = answer
+        emit("vote_confirmed", {"answer": answer, "player": player}, room=request.sid)
+        emit("update_votes", {"votes": current_votes}, room=lobby_code)
+        scores = bad_advice_hotline_game_manager.get_scores(lobby_code)
+        emit("update_scores", {"scores": scores}, room=lobby_code)
+    else:
+        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
 
 # --- Obviously Lies Handlers ---
@@ -352,7 +457,6 @@ def handle_end_round(data):
         emit("error_message", {"message": "Lobby not found."}, room=request.sid)
         return
 
-    # Determine game manager by current mode
     mode = lobbies[lobby_code].get("game_mode")
     if mode == "obviously_lies":
         res = round_manager.end_round(lobby_code)
@@ -376,6 +480,20 @@ def handle_end_round(data):
             emit("game_over", {"scores": scores}, room=lobby_code)
         else:
             reverse_guessing_game_manager.reset_round_state(lobby_code)
+            lobby_votes[lobby_code] = {}
+
+            next_round = res["next_round"]
+            emit("round_ended", {"next_round": next_round}, room=lobby_code)
+            round_manager.start_round(lobby_code)
+
+    elif mode == "bad_advice_hotline":
+        res = round_manager.end_round(lobby_code)
+
+        if res.get("game_over"):
+            scores = bad_advice_hotline_game_manager.get_scores(lobby_code)
+            emit("game_over", {"scores": scores}, room=lobby_code)
+        else:
+            bad_advice_hotline_game_manager.reset_round_state(lobby_code)
             lobby_votes[lobby_code] = {}
 
             next_round = res["next_round"]
