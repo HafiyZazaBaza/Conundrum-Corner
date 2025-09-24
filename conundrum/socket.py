@@ -4,17 +4,23 @@ from . import socketio
 import random
 import string
 from conundrum.games.obviously_lies import ObviouslyLiesGame
+from conundrum.games.reverse_guessing import ReverseGuessingGame
 from conundrum.utils.profanity_filter import ProfanityFilter
 from conundrum.utils.round_manager import round_manager
+
 
 # Lobby state: lobby_code -> lobby data
 lobbies = {}
 
-# Obviously Lies game manager instance
-obviously_lies_game_manager = ObviouslyLiesGame()
 
-# Track votes per lobby: { lobby_code: { player: answer, ... }, ... }
+# Game manager instances
+obviously_lies_game_manager = ObviouslyLiesGame()
+reverse_guessing_game_manager = ReverseGuessingGame()
+
+
+# Track votes per lobby: { lobby_code: { player: choice, ... }, ... }
 lobby_votes = {}
+
 
 # Global profanity filter (load from JSON if exists)
 pf = ProfanityFilter.from_json("data/profanity.json")
@@ -50,34 +56,16 @@ def handle_create_lobby(data):
         "game_mode": None,
     }
 
-    max_rounds = int(data.get("maxRounds", 3))   # default 3 rounds if client didn't send
-    round_manager.register_lobby(lobby_code, max_rounds=max_rounds)
-
-    round_manager.set_handler(lobby_code, {
-        "on_round_start": lambda lc, rn: None,  # optional: you may start game rounds yourself
-        "on_round_end": lambda lc, rn: obviously_lies_game_manager.on_round_end(lc, rn),  # optional
-        "reset_round": lambda lc: obviously_lies_game_manager.reset_round_state(lc),
-    })
+    max_rounds = int(data.get("maxRounds", 3))  # default 3 rounds
 
     round_manager.register_lobby(lobby_code, max_rounds=max_rounds)
-    round_manager.set_handler(lobby_code, {
-        "on_round_end": lambda lc, rn: obviously_lies_game_manager.end_round(lc),
-        "reset_round": lambda lc: obviously_lies_game_manager.reset_round_state(lc),
-    })
+
+    # Register handlers depending on game mode will be done on game start
 
     join_room(lobby_code)
 
-    emit(
-        "lobby_created",
-        {"lobbyCode": lobby_code, "username": username, "maxPlayers": max_players},
-        room=request.sid,
-    )
-
-    emit(
-        "lobby_update",
-        {"host": username, "players": lobbies[lobby_code]["players"]},
-        room=lobby_code,
-    )
+    emit("lobby_created", {"lobbyCode": lobby_code, "username": username, "maxPlayers": max_players}, room=request.sid)
+    emit("lobby_update", {"host": username, "players": lobbies[lobby_code]["players"]}, room=lobby_code)
 
 
 @socketio.on("join_lobby")
@@ -109,11 +97,7 @@ def handle_join_lobby(data):
         room=request.sid,
     )
 
-    emit(
-        "lobby_update",
-        {"host": lobby["host"], "players": lobby["players"]},
-        room=lobby_code,
-    )
+    emit("lobby_update", {"host": lobby["host"], "players": lobby["players"]}, room=lobby_code)
 
 
 @socketio.on("send_message")
@@ -126,14 +110,9 @@ def handle_send_message(data):
         emit("error_message", {"message": "Invalid message."}, room=request.sid)
         return
 
-    # Run message through profanity filter
     censored, violations = pf.clean(message)
 
-    emit(
-        "receive_message",
-        {"username": username, "message": censored, "violations": violations},
-        room=lobby_code,
-    )
+    emit("receive_message", {"username": username, "message": censored, "violations": violations}, room=lobby_code)
 
 
 @socketio.on("start_game")
@@ -160,15 +139,26 @@ def handle_start_game(data):
     round_manager.start_game(lobby_code)
     round_manager.start_round(lobby_code)
 
+    lobby_votes[lobby_code] = {}
 
     if mode == "obviously_lies":
-        obviously_lies_game_manager.end_round(lobby_code)  # Clear existing if any
-        lobby_votes[lobby_code] = {}  # Reset votes when game starts
+        obviously_lies_game_manager.end_round(lobby_code)
+        round_manager.set_handler(lobby_code, {
+            "on_round_end": lambda lc, rn: obviously_lies_game_manager.end_round(lc),
+            "reset_round": lambda lc: obviously_lies_game_manager.reset_round_state(lc),
+        })
+
+    elif mode == "reverse_guessing":
+        reverse_guessing_game_manager.end_round(lobby_code)
+        round_manager.set_handler(lobby_code, {
+            "on_round_end": lambda lc, rn: reverse_guessing_game_manager.end_round(lc),
+            "reset_round": lambda lc: reverse_guessing_game_manager.reset_round_state(lc),
+        })
 
     emit("game_started", {"lobbyCode": lobby_code, "mode": mode}, room=lobby_code)
 
 
-# --- Obviously Lies game handlers ---
+# --- Obviously Lies Handlers ---
 
 
 @socketio.on("obviously_lies_start_round")
@@ -192,17 +182,12 @@ def obviously_lies_start_round(data):
 
     players = set(lobby["players"])
     host = lobby["host"]
-    obviously_lies_game_manager.start_round(
-        lobby_code, question, correct_answer, players, host
-    )
 
-    # Reset votes for new round
+    obviously_lies_game_manager.start_round(lobby_code, question, correct_answer, players, host)
+
     lobby_votes[lobby_code] = {}
 
-    # Broadcast question to all players (without correct answer)
     emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
-
-    # Immediately emit the correct answer as part of the anonymous answers list
     emit("obviously_lies_all_answers", {"answers": [correct_answer]}, room=lobby_code)
 
 
@@ -216,7 +201,6 @@ def obviously_lies_submit_false_answer(data):
         emit("error_message", {"message": "Round not found."}, room=request.sid)
         return
 
-    # Run through profanity filter
     censored, violations = pf.clean(false_answer)
 
     success = obviously_lies_game_manager.submit_false_answer(lobby_code, player, censored)
@@ -224,18 +208,10 @@ def obviously_lies_submit_false_answer(data):
         emit("error_message", {"message": "Failed to submit false answer."}, room=request.sid)
         return
 
-    emit(
-        "obviously_lies_false_answer_submitted",
-        {"falseAnswer": censored, "violations": violations},
-        room=lobby_code,
-    )
+    emit("obviously_lies_false_answer_submitted", {"falseAnswer": censored, "violations": violations}, room=lobby_code)
 
     player_answers = obviously_lies_game_manager.get_submitted_false_answers(lobby_code)
-    emit(
-        "player_own_answers",
-        {"answers": [answer for p, answer in player_answers.items() if p == player]},
-        room=request.sid,
-    )
+    emit("player_own_answers", {"answers": [ans for p, ans in player_answers.items() if p == player]}, room=request.sid)
 
     if obviously_lies_game_manager.all_false_submitted(lobby_code):
         all_answers = obviously_lies_game_manager.get_all_answers(lobby_code)
@@ -252,7 +228,6 @@ def obviously_lies_vote(data):
     if not lobby_code or lobby_code not in lobbies:
         emit("error_message", {"message": "Lobby not found."}, room=request.sid)
         return
-
     if not obviously_lies_game_manager.games.get(lobby_code):
         emit("error_message", {"message": "Round not started."}, room=request.sid)
         return
@@ -261,7 +236,6 @@ def obviously_lies_vote(data):
     if player in current_votes:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
         return
-
     if player == lobbies[lobby_code]["host"]:
         emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
         return
@@ -276,6 +250,100 @@ def obviously_lies_vote(data):
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
+
+# --- Reverse Guessing Handlers ---
+
+
+@socketio.on("reverse_guessing_start_round")
+def reverse_guessing_start_round(data):
+    lobby_code = data.get("lobbyCode")
+    answer = data.get("answer")
+    correct_question = data.get("correctQuestion")
+    username = data.get("username")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+    if not answer or not correct_question:
+        emit("error_message", {"message": "Answer and correct question required."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the round."}, room=request.sid)
+        return
+
+    players = set(lobby["players"])
+    host = lobby["host"]
+
+    reverse_guessing_game_manager.start_round(lobby_code, answer, correct_question, players, host)
+
+    lobby_votes[lobby_code] = {}
+
+    emit("reverse_guessing_round_started", {"answer": answer}, room=lobby_code)
+    emit("reverse_guessing_all_questions", {"questions": [correct_question]}, room=lobby_code)
+
+
+@socketio.on("reverse_guessing_submit_question")
+def reverse_guessing_submit_question(data):
+    lobby_code = data.get("lobbyCode")
+    player = data.get("player")
+    guessed_question = data.get("guessedQuestion")
+
+    if not lobby_code or not reverse_guessing_game_manager.games.get(lobby_code):
+        emit("error_message", {"message": "Round not found."}, room=request.sid)
+        return
+
+    censored, violations = pf.clean(guessed_question)
+
+    success = reverse_guessing_game_manager.submit_question(lobby_code, player, censored)
+    if not success:
+        emit("error_message", {"message": "Failed to submit question."}, room=request.sid)
+        return
+
+    emit("reverse_guessing_question_submitted", {"guessedQuestion": censored, "violations": violations}, room=lobby_code)
+
+    player_questions = reverse_guessing_game_manager.get_submitted_questions(lobby_code)
+    emit("player_own_questions", {"questions": [q for p, q in player_questions.items() if p == player]}, room=request.sid)
+
+    if reverse_guessing_game_manager.all_questions_submitted(lobby_code):
+        all_questions = reverse_guessing_game_manager.get_all_questions(lobby_code)
+        random.shuffle(all_questions)
+        emit("reverse_guessing_all_questions", {"questions": all_questions}, room=lobby_code)
+
+
+@socketio.on("reverse_guessing_vote")
+def reverse_guessing_vote(data):
+    lobby_code = data.get("lobbyCode")
+    player = data.get("player")
+    question = data.get("question")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+    if not reverse_guessing_game_manager.games.get(lobby_code):
+        emit("error_message", {"message": "Round not started."}, room=request.sid)
+        return
+
+    current_votes = lobby_votes.setdefault(lobby_code, {})
+    if player in current_votes:
+        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+        return
+    if player == lobbies[lobby_code]["host"]:
+        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
+        return
+
+    success = reverse_guessing_game_manager.cast_vote(lobby_code, player, question)
+    if success:
+        current_votes[player] = question
+        emit("vote_confirmed", {"question": question, "player": player}, room=request.sid)
+        emit("update_votes", {"votes": current_votes}, room=lobby_code)
+        scores = reverse_guessing_game_manager.get_scores(lobby_code)
+        emit("update_scores", {"scores": scores}, room=lobby_code)
+    else:
+        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+
+
 @socketio.on("end_round")
 def handle_end_round(data):
     lobby_code = data.get("lobbyCode")
@@ -284,18 +352,32 @@ def handle_end_round(data):
         emit("error_message", {"message": "Lobby not found."}, room=request.sid)
         return
 
-    res = round_manager.end_round(lobby_code)
+    # Determine game manager by current mode
+    mode = lobbies[lobby_code].get("game_mode")
+    if mode == "obviously_lies":
+        res = round_manager.end_round(lobby_code)
 
-    if res["game_over"]:
-        scores = obviously_lies_game_manager.get_scores(lobby_code)
-        emit("game_over", {"scores": scores}, room=lobby_code)
-    else:
-        # Reset per-round state
-        obviously_lies_game_manager.reset_round_state(lobby_code)
-        lobby_votes[lobby_code] = {}
+        if res.get("game_over"):
+            scores = obviously_lies_game_manager.get_scores(lobby_code)
+            emit("game_over", {"scores": scores}, room=lobby_code)
+        else:
+            obviously_lies_game_manager.reset_round_state(lobby_code)
+            lobby_votes[lobby_code] = {}
 
-        next_round = res["next_round"]
-        emit("round_ended", {"next_round": next_round}, room=lobby_code)
+            next_round = res["next_round"]
+            emit("round_ended", {"next_round": next_round}, room=lobby_code)
+            round_manager.start_round(lobby_code)
 
-        # Start next round
-        round_manager.start_round(lobby_code)
+    elif mode == "reverse_guessing":
+        res = round_manager.end_round(lobby_code)
+
+        if res.get("game_over"):
+            scores = reverse_guessing_game_manager.get_scores(lobby_code)
+            emit("game_over", {"scores": scores}, room=lobby_code)
+        else:
+            reverse_guessing_game_manager.reset_round_state(lobby_code)
+            lobby_votes[lobby_code] = {}
+
+            next_round = res["next_round"]
+            emit("round_ended", {"next_round": next_round}, room=lobby_code)
+            round_manager.start_round(lobby_code)
