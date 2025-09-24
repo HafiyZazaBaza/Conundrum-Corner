@@ -1,59 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bad Advice Hotline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-    <h1>Bad Advice Hotline</h1>
+    <div class="container">
+        <h1>☎️ Bad Advice Hotline</h1>
 
-    <button onclick="startRound()">Start Round</button>
-    <div id="question"></div>
+        <!-- Question -->
+        <div id="questionBox" class="card">
+            <h2 id="questionText">Waiting for question...</h2>
+            <button id="startBtn">Start Round</button>
+        </div>
 
-    <h3>Submit Advice</h3>
-    <input id="answerInput" placeholder="Bad advice here">
-    <button onclick="submitAnswer()">Submit</button>
+        <!-- Answer submission -->
+        <div id="answerBox" class="card" style="display:none;">
+            <h3>Your Answer</h3>
+            <input type="text" id="answerInput" placeholder="Give terrible advice...">
+            <button id="submitAnswerBtn">Submit</button>
+        </div>
 
-    <h3>Vote for the Funniest</h3>
-    <div id="voteArea"></div>
+        <!-- Voting phase -->
+        <div id="voteBox" class="card" style="display:none;">
+            <h3>Vote for the worst advice</h3>
+            <ul id="answersList"></ul>
+        </div>
 
-    <div id="results"></div>
+        <!-- Scores -->
+        <div id="scoresBox" class="card" style="display:none;">
+            <h3>Scores</h3>
+            <ul id="scoresList"></ul>
+        </div>
+    </div>
 
     <script>
         const socket = io();
-        const room = "badadvice_room";
+        const room = "{{ lobby_code }}";  // passed from Flask route
+        const username = "{{ username }}"; // also passed in
 
-        function startRound() {
+        // Start round
+        document.getElementById("startBtn").addEventListener("click", () => {
             socket.emit("badadvice_start_round", { room });
-        }
+        });
 
-        function submitAnswer() {
+        // Submit answer
+        document.getElementById("submitAnswerBtn").addEventListener("click", () => {
             const answer = document.getElementById("answerInput").value;
             socket.emit("badadvice_submit_answer", { room, answer });
-        }
+            document.getElementById("answerBox").style.display = "none";
+        });
 
+        // Vote
         function castVote(voted_sid) {
             socket.emit("badadvice_cast_vote", { room, voted_sid });
+            document.getElementById("voteBox").style.display = "none";
         }
 
-        // Listen
+        // ===== SOCKET LISTENERS =====
+
+        // New question
         socket.on("badadvice_new_question", data => {
-            document.getElementById("question").innerText = "Question: " + data.question;
+            document.getElementById("questionText").innerText = data.question;
+            document.getElementById("answerBox").style.display = "block";
+            document.getElementById("answerInput").value = "";
         });
 
+        // Voting starts
         socket.on("badadvice_start_voting", data => {
-            let html = "<h3>Vote for your favorite:</h3>";
-            for (const sid in data.answers) {
-                html += `<button onclick="castVote('${sid}')">${data.answers[sid]}</button><br>`;
-            }
-            document.getElementById("voteArea").innerHTML = html;
+            const list = document.getElementById("answersList");
+            list.innerHTML = "";
+            Object.entries(data.answers).forEach(([sid, text]) => {
+                const li = document.createElement("li");
+                li.innerHTML = `${text} <button onclick="castVote('${sid}')">Vote</button>`;
+                list.appendChild(li);
+            });
+            document.getElementById("voteBox").style.display = "block";
         });
 
+        // Round result
         socket.on("badadvice_round_result", data => {
-            document.getElementById("results").innerText = "Scores: " + JSON.stringify(data.scores);
+            const scoresList = document.getElementById("scoresList");
+            scoresList.innerHTML = "";
+            Object.entries(data.scores).forEach(([user, score]) => {
+                const li = document.createElement("li");
+                li.innerText = `${user}: ${score}`;
+                scoresList.appendChild(li);
+            });
+            document.getElementById("scoresBox").style.display = "block";
         });
     </script>
 </body>
 </html>
-
-
