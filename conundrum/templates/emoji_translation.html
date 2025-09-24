@@ -17,7 +17,7 @@
       cursor: not-allowed;
     }
 
-    #submitted-sentences-section {
+    #submitted-guesses-section {
       background-color: #d9d9d9;
       border-radius: 20px;
       padding: 15px;
@@ -25,7 +25,7 @@
       box-shadow: none;
     }
 
-    .sentence-container {
+    .guess-container {
       background-color: white;
       color: black;
       border-radius: 12px;
@@ -41,7 +41,7 @@
 
     .vote-button {
       border-radius: 8px;
-      background-color: #005500;
+      background-color: #002b66;
       color: white;
       padding: 6px 16px;
       font-weight: 600;
@@ -52,12 +52,12 @@
     }
 
     .vote-button:hover:not(:disabled) {
-      background-color: #003300;
+      background-color: #001f4d;
       transform: translateY(-2px);
     }
 
     .vote-button:disabled {
-      background-color: #003300;
+      background-color: #001f4d;
       cursor: default;
       opacity: 0.7;
       box-shadow: none;
@@ -108,21 +108,7 @@
     }
 
     #scores-list li[style] {
-      color: #005500;
-    }
-
-    .emoji-prompt-container {
-      background-color: white;
-      border-radius: 12px;
-      padding: 15px;
-      margin-top: 24px;
-      box-shadow: none;
-      text-align: center;
-    }
-
-    #display-emoji-prompt {
-      font-size: 2rem;
-      font-weight: bold;
+      color: #002b66;
     }
   </style>
 </head>
@@ -134,41 +120,37 @@
 
     <!-- Host Area -->
     <div id="host-section" class="hidden">
-      <h2>Host: Create Emoji Prompt</h2>
+      <h2>Host: Enter Emoji Prompt</h2>
       <form id="host-form">
-        <label for="emoji-input">Emoji Prompt:</label>
-        <input id="emoji-input" type="text" required placeholder="e.g. 🍎📚🐱" />
-        <label for="correct-sentence-input">Correct Sentence:</label>
-        <input id="correct-sentence-input" type="text" required placeholder="Sentence translation..." />
+        <label for="emoji-prompt-input">Emoji Prompt:</label>
+        <input id="emoji-prompt-input" type="text" required placeholder="Enter emoji sequence..." />
         <button type="submit">Start Round</button>
       </form>
     </div>
 
-    <!-- Emoji Prompt Section with Container -->
+    <!-- Emoji Prompt Display -->
     <div id="emoji-prompt-section" class="hidden">
-      <div class="emoji-prompt-container">
-        <h2>Emoji Prompt:</h2>
-        <p id="display-emoji-prompt"></p>
-      </div>
+      <h2>Emoji Prompt:</h2>
+      <p id="display-emoji-prompt" style="font-size: 2rem;"></p>
     </div>
 
     <!-- Player Area -->
     <div id="player-submit-section" class="hidden">
-      <h3>Your Sentence Guess</h3>
-      <form id="sentence-submit-form">
-        <input id="sentence-input" type="text" required placeholder="Write your sentence guess..." />
-        <button type="submit">Submit Sentence</button>
+      <h3>Your Guess</h3>
+      <form id="guess-form">
+        <input id="guess-input" type="text" required placeholder="Translate the emoji prompt..." />
+        <button type="submit">Submit Guess</button>
       </form>
       <p id="submit-status"></p>
     </div>
 
-    <!-- Display Submitted Sentences -->
-    <div id="submitted-sentences-section" class="hidden">
-      <h3>Submitted Sentences</h3>
-      <div id="submitted-sentences"></div>
+    <!-- Display Submitted Guesses -->
+    <div id="submitted-guesses-section" class="hidden">
+      <h3>Submitted Guesses</h3>
+      <div id="submitted-guesses"></div>
     </div>
 
-    <!-- Players Who Have Voted -->
+    <!-- Players Who Have Voted Section -->
     <div id="voted-players-section" class="hidden">
       <h3>Players who have voted</h3>
       <div id="voted-players-list"></div>
@@ -187,9 +169,8 @@
     const username = "{{ username }}";
     let isHost = false;
     let emojiPrompt = "";
-    let correctSentence = "";
     let hasVoted = false;
-    let mySubmittedSentences = new Set();
+    let myGuesses = new Set();
 
     socket.on("connect", () => {
       socket.emit("join_lobby", { username, lobbyCode });
@@ -204,22 +185,21 @@
 
     document.getElementById("host-form").addEventListener("submit", e => {
       e.preventDefault();
-      emojiPrompt = document.getElementById("emoji-input").value.trim();
-      correctSentence = document.getElementById("correct-sentence-input").value.trim();
-      if (!emojiPrompt || !correctSentence) {
-        alert("Please enter both emoji prompt and correct sentence.");
+      emojiPrompt = document.getElementById("emoji-prompt-input").value.trim();
+      if (!emojiPrompt) {
+        alert("Please enter an emoji prompt.");
         return;
       }
-      socket.emit("emoji_translation_start_round", { lobbyCode, emojiPrompt, correctSentence, username });
+      socket.emit("emoji_translation_start_round", { lobbyCode, emojiPrompt, username });
     });
 
     socket.on("emoji_translation_round_started", data => {
-      emojiPrompt = data.emojiPrompt || "";
+      emojiPrompt = data.emoji_prompt || "";
       document.getElementById("emoji-prompt-section").classList.remove("hidden");
       document.getElementById("display-emoji-prompt").textContent = emojiPrompt;
 
       hasVoted = false;
-      mySubmittedSentences.clear();
+      myGuesses.clear();
 
       if (isHost) {
         document.getElementById("host-section").classList.add("hidden");
@@ -227,38 +207,38 @@
         document.getElementById("player-submit-section").classList.remove("hidden");
       }
       document.getElementById("submit-status").textContent = "";
-      document.getElementById("sentence-input").disabled = false;
-      document.querySelector("#sentence-submit-form button").disabled = false;
-      document.getElementById("submitted-sentences-section").classList.remove("hidden");
+      document.getElementById("guess-input").disabled = false;
+      document.querySelector("#guess-form button").disabled = false;
+      document.getElementById("submitted-guesses-section").classList.remove("hidden");
       document.getElementById("voted-players-section").classList.remove("hidden");
       document.getElementById("scores-section").classList.remove("hidden");
 
-      document.getElementById("submitted-sentences").innerHTML = "";
+      document.getElementById("submitted-guesses").innerHTML = "";
       document.getElementById("voted-players-list").innerHTML = "";
       document.getElementById("scores-list").innerHTML = "";
     });
 
-    document.getElementById("sentence-submit-form").addEventListener("submit", e => {
+    document.getElementById("guess-form").addEventListener("submit", e => {
       e.preventDefault();
-      const sentence = document.getElementById("sentence-input").value.trim();
-      if (!sentence) {
-        alert("Please enter a sentence.");
+      const guess = document.getElementById("guess-input").value.trim();
+      if (!guess) {
+        alert("Please enter your guess.");
         return;
       }
-      socket.emit("emoji_translation_submit_sentence", { lobbyCode, player: username, sentence });
+      socket.emit("emoji_translation_submit_guess", { lobbyCode, player: username, guess });
       document.getElementById("submit-status").textContent = "Submitted!";
-      document.getElementById("sentence-input").value = "";
-      document.getElementById("sentence-input").disabled = true;
+      document.getElementById("guess-input").value = "";
+      document.getElementById("guess-input").disabled = true;
       e.target.querySelector("button").disabled = true;
-      mySubmittedSentences.add(sentence);
+      myGuesses.add(guess);
     });
 
-    function createSentenceContainer(sentence) {
+    function createGuessContainer(guess) {
       const container = document.createElement("div");
-      container.classList.add("sentence-container");
-      container.textContent = sentence;
+      container.classList.add("guess-container");
+      container.textContent = guess;
 
-      if (!isHost && !hasVoted && !mySubmittedSentences.has(sentence)) {
+      if (!isHost && !hasVoted && !myGuesses.has(guess)) {
         const voteBtn = document.createElement("button");
         voteBtn.classList.add("vote-button");
         voteBtn.textContent = "Vote";
@@ -267,7 +247,7 @@
         voteBtn.onclick = () => {
           if (hasVoted) return;
           document.querySelectorAll(".vote-button").forEach(btn => btn.disabled = true);
-          socket.emit("emoji_translation_vote", { lobbyCode, player: username, sentence });
+          socket.emit("emoji_translation_vote", { lobbyCode, player: username, guess });
         };
 
         container.appendChild(voteBtn);
@@ -282,18 +262,18 @@
       return container;
     }
 
-    socket.on("emoji_translation_sentence_submitted", data => {
-      const container = createSentenceContainer(data.sentence);
-      document.getElementById("submitted-sentences").appendChild(container);
+    socket.on("emoji_translation_guess_submitted", data => {
+      const guessContainer = createGuessContainer(data.guess);
+      document.getElementById("submitted-guesses").appendChild(guessContainer);
     });
 
-    socket.on("emoji_translation_all_sentences", data => {
+    socket.on("emoji_translation_all_guesses", data => {
       hasVoted = false;
-      const sentencesDiv = document.getElementById("submitted-sentences");
-      sentencesDiv.innerHTML = "";
-      data.sentences.forEach(sentence => {
-        const container = createSentenceContainer(sentence);
-        sentencesDiv.appendChild(container);
+      const guessesDiv = document.getElementById("submitted-guesses");
+      guessesDiv.innerHTML = "";
+      data.guesses.forEach(guess => {
+        const guessContainer = createGuessContainer(guess);
+        guessesDiv.appendChild(guessContainer);
       });
       document.getElementById("voted-players-list").innerHTML = "";
     });
@@ -323,13 +303,13 @@
       const votes = data.votes;
       const container = document.getElementById("voted-players-list");
       container.innerHTML = "";
-      Object.entries(votes).forEach(([player, sentence]) => {
+      Object.entries(votes).forEach(([player, guess]) => {
         const infoDiv = document.createElement("div");
         infoDiv.classList.add("voted-player-info");
         if (player === username) {
-          infoDiv.textContent = `you have voted for "${sentence}"`;
+          infoDiv.textContent = `you have voted for ${guess}`;
         } else {
-          infoDiv.textContent = `${player} has voted for "${sentence}"`;
+          infoDiv.textContent = `${player} has voted for ${guess}`;
         }
         container.appendChild(infoDiv);
       });
@@ -344,7 +324,7 @@
         li.textContent = `${player}: ${score} point${score !== 1 ? "s" : ""}`;
         if (player === username) {
           li.style.fontWeight = "bold";
-          li.style.color = "#005500";
+          li.style.color = "#002b66";
         }
         scoresList.appendChild(li);
       });
