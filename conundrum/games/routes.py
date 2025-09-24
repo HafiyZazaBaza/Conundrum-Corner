@@ -1,17 +1,19 @@
 # conundrum/games/routes.py
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify
 
-# Import central socket/lobbies (adjust if you renamed to engine.py or socket.py)
 from conundrum import socket as socket_module  
 
 # Import game classes
 from conundrum.games.obviously_lies import ObviouslyLiesGame
 
-# Import profanity filter
 from conundrum.utils.profanity_filter import ProfanityFilter
 
 # Import main routes blueprint for redirects
 from conundrum.routes import routes  
+
+from conundrum.utils.rounds import round_manager
+
+from engine import lobbies
 
 # --------------------------
 # Blueprint
@@ -116,3 +118,27 @@ def check_message():
         "censored": censored,
         "violations": violations,
     })
+
+@routes.route("/create_lobby", methods=["POST"])
+def create_lobby():
+    data = request.get_json()
+    lobby_id = data.get("lobby_id")
+    host = data.get("username")
+    max_players = data.get("max_players", 4)
+    total_rounds = data.get("total_rounds", 5)  # 👈 new field
+
+    # Create the lobby
+    lobbies[lobby_id] = {
+        "host": host,
+        "players": [host],
+        "max_players": max_players,
+        "game_mode": None,
+        "current_round": 1,
+        "total_rounds": total_rounds,
+        "game_active": False,
+    }
+
+    # Setup round manager 👇
+    round_manager.setup_lobby(lobby_id, total_rounds=total_rounds)
+
+    return jsonify({"success": True, "lobby_id": lobby_id})
