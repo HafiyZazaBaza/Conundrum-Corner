@@ -6,19 +6,25 @@ import string
 from conundrum.games.obviously_lies import ObviouslyLiesGame
 from conundrum.games.reverse_guessing import ReverseGuessingGame
 from conundrum.games.bad_advice_hotline import BadAdviceHotlineGame
+from conundrum.games.emoji_translation import EmojiTranslationGame
 from conundrum.utils.profanity_filter import ProfanityFilter
 from conundrum.utils.round_manager import round_manager
 
+
 # Lobby state: lobby_code -> lobby data
 lobbies = {}
+
 
 # Game manager instances
 obviously_lies_game_manager = ObviouslyLiesGame()
 reverse_guessing_game_manager = ReverseGuessingGame()
 bad_advice_hotline_game_manager = BadAdviceHotlineGame()
+emoji_translation_game_manager = EmojiTranslationGame()
+
 
 # Track votes per lobby: { lobby_code: { player: choice, ... }, ... }
 lobby_votes = {}
+
 
 # Global profanity filter (load from JSON if exists)
 pf = ProfanityFilter.from_json("data/profanity.json")
@@ -165,6 +171,16 @@ def handle_start_game(data):
             {
                 "on_round_end": lambda lc, rn: bad_advice_hotline_game_manager.end_round(lc),
                 "reset_round": lambda lc: bad_advice_hotline_game_manager.reset_round_state(lc),
+            },
+        )
+
+    elif mode == "emoji_translation":
+        emoji_translation_game_manager.end_round(lobby_code)
+        round_manager.set_handler(
+            lobby_code,
+            {
+                "on_round_end": lambda lc, rn: emoji_translation_game_manager.end_round(lc),
+                "reset_round": lambda lc: emoji_translation_game_manager.reset_round_state(lc),
             },
         )
 
@@ -449,6 +465,102 @@ def reverse_guessing_vote(data):
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
 
+# --- Emoji Translation Handlers ---
+
+
+@socketio.on("emoji_translation_start_round")
+def emoji_translation_start_round(data):
+    lobby_code = data.get("lobbyCode")
+    emoji_prompt = data.get("emojiPrompt")
+    correct_sentence = data.get("correctSentence")
+    username = data.get("username")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+    if not emoji_prompt or not correct_sentence:
+        emit("error_message", {"message": "Emoji prompt and correct sentence required."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the round."}, room=request.sid)
+        return
+
+    players = set(lobby["players"])
+    host = lobby["host"]
+
+    emoji_translation_game_manager.start_round(lobby_code, emoji_prompt, correct_sentence, players, host)
+
+    lobby_votes[lobby_code] = {}
+
+    emit("emoji_translation_round_started", {"emojiPrompt": emoji_prompt}, room=lobby_code)
+    emit("emoji_translation_all_sentences", {"sentences": [correct_sentence]}, room=lobby_code)
+
+
+@socketio.on("emoji_translation_submit_sentence")
+def emoji_translation_submit_sentence(data):
+    lobby_code = data.get("lobbyCode")
+    player = data.get("player")
+    sentence = data.get("sentence")
+
+    if not lobby_code or not emoji_translation_game_manager.games.get(lobby_code):
+        emit("error_message", {"message": "Round not found."}, room=request.sid)
+        return
+
+    censored, violations = pf.clean(sentence)
+
+    success = emoji_translation_game_manager.submit_sentence(lobby_code, player, censored)
+    if not success:
+        emit("error_message", {"message": "Failed to submit sentence."}, room=request.sid)
+        return
+
+    emit("emoji_translation_sentence_submitted", {"sentence": censored, "violations": violations}, room=lobby_code)
+
+    player_sentences = emoji_translation_game_manager.get_submitted_sentences(lobby_code)
+    emit("player_own_sentences", {"sentences": [s for p, s in player_sentences.items() if p == player]}, room=request.sid)
+
+    if emoji_translation_game_manager.all_sentences_submitted(lobby_code):
+        all_sentences = emoji_translation_game_manager.get_all_sentences(lobby_code)
+        random.shuffle(all_sentences)
+        emit("emoji_translation_all_sentences", {"sentences": all_sentences}, room=lobby_code)
+
+
+@socketio.on("emoji_translation_vote")
+def emoji_translation_vote(data):
+    lobby_code = data.get("lobbyCode")
+    player = data.get("player")
+    sentence = data.get("sentence")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+    if not emoji_translation_game_manager.games.get(lobby_code):
+        emit("error_message", {"message": "Round not started."}, room=request.sid)
+        return
+
+    current_votes = lobby_votes.setdefault(lobby_code, {})
+    if player in current_votes:
+        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+        return
+    if player == lobbies[lobby_code]["host"]:
+        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
+        return
+
+    success = emoji_translation_game_manager.cast_vote(lobby_code, player, sentence)
+    if success:
+        current_votes[player] = sentence
+        emit("vote_confirmed", {"sentence": sentence, "player": player}, room=request.sid)
+        emit("update_votes", {"votes": current_votes}, room=lobby_code)
+        scores = emoji_translation_game_manager.get_scores(lobby_code)
+        emit("update_scores", {"scores": scores}, room=lobby_code)
+    else:
+        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+
+
+# --- End Round Handler ---
+
+
 @socketio.on("end_round")
 def handle_end_round(data):
     lobby_code = data.get("lobbyCode")
@@ -494,6 +606,20 @@ def handle_end_round(data):
             emit("game_over", {"scores": scores}, room=lobby_code)
         else:
             bad_advice_hotline_game_manager.reset_round_state(lobby_code)
+            lobby_votes[lobby_code] = {}
+
+            next_round = res["next_round"]
+            emit("round_ended", {"next_round": next_round}, room=lobby_code)
+            round_manager.start_round(lobby_code)
+
+    elif mode == "emoji_translation":
+        res = round_manager.end_round(lobby_code)
+
+        if res.get("game_over"):
+            scores = emoji_translation_game_manager.get_scores(lobby_code)
+            emit("game_over", {"scores": scores}, room=lobby_code)
+        else:
+            emoji_translation_game_manager.reset_round_state(lobby_code)
             lobby_votes[lobby_code] = {}
 
             next_round = res["next_round"]
