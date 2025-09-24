@@ -9,7 +9,8 @@ app.config['SECRET_KEY'] = 'super-secret-key'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Store lobbies in memory
-# Format:
+lobbies = {}
+# Example:
 # {
 #   "ABCD": {
 #       "host": "Alice",
@@ -18,15 +19,88 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 #       "max_players": 4,
 #       "max_rounds": 5,
 #       "current_round": 0,
-#       "game_active": False
+#       "game_active": False,
+#       "votes": {}   # added for round management
 #   }
 # }
-lobbies = {}
 
 
 def generate_code(length=4):
     """Generate random uppercase lobby code."""
     return ''.join(random.choices(string.ascii_uppercase, k=length))
+
+
+# ---------- ROUND MANAGER ----------
+class RoundManager:
+    def __init__(self, socketio):
+        self.socketio = socketio
+
+    def start_round(self, lobby_code):
+        lobby = lobbies.get(lobby_code)
+        if not lobby:
+            return
+
+        lobby["votes"] = {}
+        lobby["game_active"] = True
+        round_number = lobby["current_round"]
+
+        self.socketio.emit("round_started", {
+            "lobbyCode": lobby_code,
+            "round": round_number,
+            "maxRounds": lobby["max_rounds"]
+        }, room=lobby_code)
+
+    def submit_vote(self, lobby_code, username, choice):
+        lobby = lobbies.get(lobby_code)
+        if not lobby or not lobby.get("game_active"):
+            return
+
+        lobby["votes"][username] = choice
+
+        # All players voted?
+        if len(lobby["votes"]) >= len(lobby["players"]):
+            self.end_round(lobby_code)
+
+    def end_round(self, lobby_code):
+        lobby = lobbies.get(lobby_code)
+        if not lobby:
+            return
+
+        lobby["game_active"] = False
+        round_number = lobby["current_round"]
+
+        # Placeholder summary payload
+        summary = {
+            "round": round_number,
+            "votes": lobby["votes"]
+        }
+
+        # Emit summary
+        self.socketio.emit("round_summary", {
+            "lobbyCode": lobby_code,
+            "summary": summary
+        }, room=lobby_code)
+
+        # Delay, then move to next round or end game
+        self.socketio.start_background_task(self._delayed_next_round, lobby_code)
+
+    def _delayed_next_round(self, lobby_code):
+        self.socketio.sleep(3)  # 3s delay
+        lobby = lobbies.get(lobby_code)
+        if not lobby:
+            return
+
+        if lobby["current_round"] < lobby["max_rounds"]:
+            lobby["current_round"] += 1
+            self.start_round(lobby_code)
+        else:
+            self.socketio.emit("game_over", {
+                "lobbyCode": lobby_code,
+                "results": "Final results placeholder"
+            }, room=lobby_code)
+
+
+round_manager = RoundManager(socketio)
 
 
 # ---------- ROUTES ----------
@@ -75,20 +149,18 @@ def on_create_lobby(data):
         "game_mode": game_mode,
         "max_players": max_players,
         "max_rounds": max(1, max_rounds),
-        "current_round": 0,   # 0 = not started, will set to 1 on start
-        "game_active": False
+        "current_round": 0,   # 0 = not started
+        "game_active": False,
+        "votes": {}
     }
 
     join_room(lobby_code)
-    emit(
-        "lobby_created",
-        {
-            "username": username,
-            "lobbyCode": lobby_code,
-            "gameMode": game_mode,
-            "maxRounds": lobbies[lobby_code]["max_rounds"]
-        },
-    )
+    emit("lobby_created", {
+        "username": username,
+        "lobbyCode": lobby_code,
+        "gameMode": game_mode,
+        "maxRounds": lobbies[lobby_code]["max_rounds"]
+    })
 
 
 @socketio.on("join_lobby")
@@ -111,9 +183,7 @@ def on_join_lobby(data):
     lobby["players"].append(username)
     join_room(lobby_code)
 
-    # update everyone in room
     emit("lobby_update", {"players": lobby["players"], "host": lobby["host"]}, room=lobby_code)
-    # tell joining player to go to lobby page
     emit("lobby_joined", {"username": username, "lobbyCode": lobby_code, "gameMode": lobby["game_mode"]})
 
 
@@ -130,11 +200,9 @@ def on_leave_lobby(data):
         lobby["players"].remove(username)
         leave_room(lobby_code)
 
-    # if host left, pick a new host (simple fallback)
     if lobby.get("host") == username and lobby["players"]:
         lobby["host"] = lobby["players"][0]
 
-    # if no players left, remove lobby
     if not lobby["players"]:
         del lobbies[lobby_code]
         return
@@ -161,7 +229,7 @@ def on_start_game(data):
 
     if lobby_code in lobbies and lobbies[lobby_code]["host"] == username:
         lobby = lobbies[lobby_code]
-        # allow host to override max rounds on start if provided
+
         if requested_max_rounds is not None:
             try:
                 mr = int(requested_max_rounds)
@@ -171,51 +239,25 @@ def on_start_game(data):
 
         lobby["game_mode"] = mode
         lobby["game_active"] = True
-        lobby["current_round"] = 1  # start at round 1
+        lobby["current_round"] = 1
 
-        emit(
-            "game_started",
-            {
-                "mode": mode,
-                "current_round": lobby["current_round"],
-                "max_rounds": lobby["max_rounds"]
-            },
-            room=lobby_code
-        )
+        emit("game_started", {
+            "mode": mode,
+            "current_round": lobby["current_round"],
+            "max_rounds": lobby["max_rounds"]
+        }, room=lobby_code)
+
+        # kick off round 1
+        round_manager.start_round(lobby_code)
 
 
-@socketio.on("next_round")
-def on_next_round(data):
-    """Host triggers advancing to the next round."""
+@socketio.on("submit_vote")
+def on_submit_vote(data):
     lobby_code = data.get("lobbyCode")
     username = data.get("username")
+    choice = data.get("choice")
 
-    if lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found"})
-        return
-
-    lobby = lobbies[lobby_code]
-    if lobby.get("host") != username:
-        emit("error_message", {"message": "Only the host can advance rounds"})
-        return
-
-    if not lobby.get("game_active"):
-        emit("error_message", {"message": "Game is not active"})
-        return
-
-    # advance round
-    if lobby["current_round"] >= lobby["max_rounds"]:
-        # game over
-        lobby["game_active"] = False
-        emit("game_over", {"final_round": lobby["current_round"]}, room=lobby_code)
-        return
-
-    lobby["current_round"] += 1
-    emit(
-        "round_updated",
-        {"current_round": lobby["current_round"], "max_rounds": lobby["max_rounds"]},
-        room=lobby_code
-    )
+    round_manager.submit_vote(lobby_code, username, choice)
 
 
 if __name__ == "__main__":

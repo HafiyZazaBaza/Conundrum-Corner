@@ -1,6 +1,8 @@
 from flask_socketio import emit, join_room
 from flask import request
 from . import socketio
+import time
+import threading
 import random
 import string
 from conundrum.games.obviously_lies import ObviouslyLiesGame
@@ -276,6 +278,44 @@ def obviously_lies_vote(data):
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
+    #confirming a vote
+    scores = obviously_lies_game_manager.get_scores(lobby_code)
+    emit("update_scores", {"scores": scores}, room=lobby_code)
+
+    # Check if ALL non-host players have voted
+    all_players = set(lobbies[lobby_code]["players"])
+    host = lobbies[lobby_code]["host"]
+    eligible_voters = all_players - {host}
+    if eligible_voters.issubset(current_votes.keys()):
+        # Schedule delayed round end
+        def delayed_end_round():
+            time.sleep(5)  # 3-second delay before ending the round
+            res = round_manager.end_round(lobby_code)
+            if res["game_over"]:
+                emit("game_over", {"scores": scores}, room=lobby_code)
+            else:
+                next_round = res["next_round"]
+                emit("round_ended", {"next_round": next_round, "scores": scores}, room=lobby_code)
+                round_manager.start_round(lobby_code)
+                # Reset per-round state for Obviously Lies
+                obviously_lies_game_manager.reset_round_state(lobby_code)
+
+        socketio.start_background_task(delayed_end_round)
+    
+    if obviously_lies_game_manager.all_false_submitted(lobby_code):
+        all_answers = obviously_lies_game_manager.get_all_answers(lobby_code)
+        random.shuffle(all_answers)
+        emit("obviously_lies_all_answers", {"answers": all_answers}, room=lobby_code)
+
+    # When everyone has voted
+    if len(current_votes) >= len(lobbies[lobby_code]["players"]) - 1:  # exclude host
+        emit("round_ending_soon", {"countdown": 5}, room=lobby_code)
+        schedule_round_end(lobby_code, delay=5)
+
+    if len(current_votes) >= len(lobbies[lobby_code]["players"]) - 1:  # exclude host
+        emit("round_ending_soon", {"countdown": 5}, room=lobby_code)
+        schedule_round_end(lobby_code, delay=5)
+
 @socketio.on("end_round")
 def handle_end_round(data):
     lobby_code = data.get("lobbyCode")
@@ -299,3 +339,53 @@ def handle_end_round(data):
 
         # Start next round
         round_manager.start_round(lobby_code)
+
+def schedule_round_end(lobby_code, delay=5):
+    def delayed():
+        socketio.sleep(delay)  # non-blocking sleep in Flask-SocketIO
+        res = round_manager.end_round(lobby_code)
+        summary = obviously_lies_game_manager.end_round(lobby_code)
+
+        if res["game_over"]:
+            emit(
+                "game_over",
+                {"scores": summary["scores"]},
+                room=lobby_code
+            )
+        else:
+            emit(
+                "round_summary",
+                {
+                    "roundNumber": res["current_round"],
+                    "totalRounds": res["total_rounds"],
+                    "summary": summary,
+                    "nextRoundIn": delay,
+                },
+                room=lobby_code,
+            )
+
+            # Reset game state for new round
+            players = set(lobbies[lobby_code]["players"])
+            host = lobbies[lobby_code]["host"]
+
+            # Placeholder Q/A for now
+            next_question = f"Auto-generated question {res['current_round']}"
+            next_answer = f"Answer {res['current_round']}"
+
+            # Start new round
+            round_manager.start_round(lobby_code)
+            obviously_lies_game_manager.start_round(
+                lobby_code,
+                next_question,
+                next_answer,
+                players,
+                host
+            )
+
+            # Announce new round
+            emit(
+                "obviously_lies_round_started",
+                {"question": next_question},
+                room=lobby_code
+            )
+    threading.Thread(target=delayed).start()

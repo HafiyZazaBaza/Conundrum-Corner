@@ -113,25 +113,21 @@ class ObviouslyLiesGame:
         return game.get("scores", {})
 
     def end_round(self, lobby_code):
-        """Finalize round but do not delete scores (RoundManager decides if game ends)."""
+        """Finalize round but keep scores. Returns summary payload."""
         game = self.games.get(lobby_code)
         if not game:
             return {}
-        # could compute summary stats here if you want
+
         summary = {
             "scores": game["scores"].copy(),
-            "votes": {ans: list(voters) for ans, voters in game["votes"].items()},
+            "votes": [
+                {
+                    "answer": ans,
+                    "voters": list(voters),
+                    "owner": game["answer_to_player"].get(ans),
+                }
+                for ans, voters in game["votes"].items()
+            ],
         }
         return summary
-   
-    def reset_round_state(self, lobby_code):
-        """Reset per-round state but keep scores intact."""
-        game = self.games.get(lobby_code)
-        if not game:
-            return
-        game.update({
-            "false_answers": {},
-            "finished_submitting": set(),
-            "votes": {game["correct_answer"]: set()},
-            "answer_to_player": {game["correct_answer"]: None},
-        })
+
