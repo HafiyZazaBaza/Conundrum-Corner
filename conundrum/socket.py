@@ -5,6 +5,7 @@ import random
 import string
 from conundrum.games.obviously_lies import ObviouslyLiesGame
 from conundrum.utils.profanity_filter import ProfanityFilter
+from conundrum.utils.round_manager import round_manager
 
 # Lobby state: lobby_code -> lobby data
 lobbies = {}
@@ -48,6 +49,21 @@ def handle_create_lobby(data):
         "max_players": max_players,
         "game_mode": None,
     }
+
+    max_rounds = int(data.get("maxRounds", 3))   # default 3 rounds if client didn't send
+    round_manager.register_lobby(lobby_code, max_rounds=max_rounds)
+
+    round_manager.set_handler(lobby_code, {
+        "on_round_start": lambda lc, rn: None,  # optional: you may start game rounds yourself
+        "on_round_end": lambda lc, rn: obviously_lies_game_manager.on_round_end(lc, rn),  # optional
+        "reset_round": lambda lc: obviously_lies_game_manager.reset_round_state(lc),
+    })
+
+    round_manager.register_lobby(lobby_code, max_rounds=max_rounds)
+    round_manager.set_handler(lobby_code, {
+        "on_round_end": lambda lc, rn: obviously_lies_game_manager.end_round(lc),
+        "reset_round": lambda lc: obviously_lies_game_manager.reset_round_state(lc),
+    })
 
     join_room(lobby_code)
 
@@ -140,6 +156,10 @@ def handle_start_game(data):
         return
 
     lobby["game_mode"] = mode
+
+    round_manager.start_game(lobby_code)
+    round_manager.start_round(lobby_code)
+
 
     if mode == "obviously_lies":
         obviously_lies_game_manager.end_round(lobby_code)  # Clear existing if any
@@ -255,3 +275,27 @@ def obviously_lies_vote(data):
         emit("update_scores", {"scores": scores}, room=lobby_code)
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+
+@socketio.on("end_round")
+def handle_end_round(data):
+    lobby_code = data.get("lobbyCode")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+
+    res = round_manager.end_round(lobby_code)
+
+    if res["game_over"]:
+        scores = obviously_lies_game_manager.get_scores(lobby_code)
+        emit("game_over", {"scores": scores}, room=lobby_code)
+    else:
+        # Reset per-round state
+        obviously_lies_game_manager.reset_round_state(lobby_code)
+        lobby_votes[lobby_code] = {}
+
+        next_round = res["next_round"]
+        emit("round_ended", {"next_round": next_round}, room=lobby_code)
+
+        # Start next round
+        round_manager.start_round(lobby_code)
