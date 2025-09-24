@@ -6,20 +6,6 @@
     <title>Conundrum Corner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <style>
-        label {
-            display: block;
-            font-weight: bold;
-            color: black;
-            margin: 8px 0 4px;
-            text-align: left;
-        }
-        input {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 12px;
-        }
-    </style>
 </head>
 <body>
     <div class="container">
@@ -48,7 +34,7 @@
                     <input id="join-username" type="text" name="username" placeholder="Enter your name" required>
 
                     <label for="join-lobby-code">Lobby Code</label>
-                    <input id="join-lobby-code" type="text" name="lobby_code" placeholder="e.g. ABCD" maxlength="4" required>
+                    <input id="join-lobby-code" type="text" name="lobby_code" placeholder="e.g. ABCD" maxlength="5" required>
 
                     <button type="submit">Join</button>
                 </form>
@@ -59,28 +45,35 @@
     <script>
         const socket = io();
 
+        // Debug connection
+        socket.on("connect", () => {
+            console.log("✅ Connected:", socket.id);
+        });
+
         // Create Lobby
         document.getElementById("createLobbyForm").addEventListener("submit", e => {
             e.preventDefault();
-            const username = e.target.username.value;
-            const maxPlayers = e.target.max_players.value || 2; // default to 2 if blank
+            const username = e.target.username.value.trim();
+            const maxPlayers = e.target.max_players.value || 2;
             socket.emit("create_lobby", { username, maxPlayers });
         });
 
         // Join Lobby
         document.getElementById("joinLobbyForm").addEventListener("submit", e => {
             e.preventDefault();
-            const username = e.target.username.value;
-            const lobbyCode = e.target.lobby_code.value.toUpperCase();
+            const username = e.target.username.value.trim();
+            const lobbyCode = e.target.lobby_code.value.trim().toUpperCase();
             socket.emit("join_lobby", { username, lobbyCode });
         });
 
         // ✅ Redirects
         socket.on("lobby_created", data => {
+            console.log("Lobby created:", data);
             window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}`;
         });
 
         socket.on("lobby_joined", data => {
+            console.log("Lobby joined:", data);
             window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}`;
         });
 

@@ -1,22 +1,32 @@
 # conundrum/games/routes.py
-from flask import Blueprint, render_template, session, redirect, url_for, request
-from .. import socket as socket_module  # central lobbies live in socket.py
+from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify
+
+# Import central socket/lobbies (adjust if you renamed to engine.py or socket.py)
+from conundrum import socket as socket_module  
 
 # Import game classes
-from .reverse_guessing import ReverseGuessingGame
-from .bad_advice_hotline import BadAdviceGame
-from .emoji_translation import EmojiTranslationGame
-from .obviously_lies import ObviouslyLiesGame
+from conundrum.games.obviously_lies import ObviouslyLiesGame
 
+# Import profanity filter
+from conundrum.utils.profanity_filter import ProfanityFilter
+
+# Import main routes blueprint for redirects
+from conundrum.routes import routes  
+
+# --------------------------
+# Blueprint
+# --------------------------
 games_bp = Blueprint("games", __name__, url_prefix="/games")
 
 # --------------------------
 # Game Instances
 # --------------------------
-reverse_game = ReverseGuessingGame()
-bad_advice_game = BadAdviceGame()
-emoji_game = EmojiTranslationGame()
 lies_game = ObviouslyLiesGame()
+
+# --------------------------
+# Profanity Filter Instance
+# --------------------------
+pf = ProfanityFilter()
 
 # --------------------------
 # Lobby Route
@@ -28,26 +38,34 @@ def lobby():
     lobby_code = request.args.get("lobby")
 
     if not username or not lobby_code:
-        return redirect(url_for("home"))
+        return redirect(url_for("routes.home"))  # routes.home is in main routes.py
 
     session["username"] = username
     session["lobby"] = lobby_code
 
-    # Check if this user is the host
+    # Lobby data defaults
     is_host = False
     game_mode = None
+    lobby_data = {}
+
     if lobby_code in socket_module.lobbies:
         lobby = socket_module.lobbies[lobby_code]
         if lobby.get("host") == username:
             is_host = True
         game_mode = lobby.get("game_mode")  # may be None until host selects
+        lobby_data = {
+            "max_rounds": lobby.get("max_rounds"),
+            "current_round": lobby.get("current_round"),
+            "game_active": lobby.get("game_active"),
+        }
 
     return render_template(
         "lobby.html",
         username=username,
         lobby_code=lobby_code,
         game_mode=game_mode,
-        is_host=is_host
+        is_host=is_host,
+        lobby_data=lobby_data,
     )
 
 # --------------------------
@@ -61,7 +79,7 @@ def play():
     game_mode = request.args.get("mode")
 
     if not username or not lobby_code or not game_mode:
-        return redirect(url_for("home"))
+        return redirect(url_for("routes.home"))
 
     # Save session info
     session["username"] = username
@@ -79,5 +97,22 @@ def play():
     if game_mode in valid_modes:
         return render_template(valid_modes[game_mode], username=username, lobby_code=lobby_code)
     else:
-        # fallback → back to lobby
         return redirect(url_for("games.lobby", username=username, lobby=lobby_code))
+
+# --------------------------
+# Profanity Check API
+# --------------------------
+@games_bp.route("/check_message", methods=["POST"])
+def check_message():
+    """API endpoint to check + censor a message with the profanity filter."""
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "")
+
+    violations = pf.check(message)
+    censored = pf.censor(message)
+
+    return jsonify({
+        "original": message,
+        "censored": censored,
+        "violations": violations,
+    })
