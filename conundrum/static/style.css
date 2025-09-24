@@ -328,7 +328,7 @@ button:hover:not(:disabled) {
 /* Game Styles for all game UI containers */
 #host-section,
 #question-section,
-#answer-section,       /* Add answer-section to apply styles for Reverse Guessing */
+#answer-section,       
 #player-submit-section,
 #answers-section,
 #selection-section,
