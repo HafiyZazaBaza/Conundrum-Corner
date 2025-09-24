@@ -17,7 +17,9 @@
     { "emoji": "😜", "keywords": ["playful", "winking", "tongue out", "funny", "silly"] },
     { "emoji": "💀", "keywords": ["skeleton", "death", "spooky", "halloween", "scary"] },
     { "emoji": "👻", "keywords": ["ghost", "spooky", "scary", "halloween", "funny ghost"] },
-    { "emoji": "🤡", "keywords": ["clown", "funny", "creepy", "circus", "joker"] }
+    { "emoji": "🤡", "keywords": ["clown", "funny", "creepy", "circus", "joker"] },
+    { "emoji": "😳", "keywords": ["embarrassed", "blushing", "shy", "awkward"] },
+    { "emoji": "🥺", "keywords": ["pleading", "puppy eyes", "soft", "cute", "emotion"] }
   ],
   "animals": [
     { "emoji": "🐶", "keywords": ["dog", "puppy", "pet", "canine", "animal"] },
@@ -37,7 +39,8 @@
     { "emoji": "🦀", "keywords": ["crab", "sea", "animal", "pincher", "ocean"] },
     { "emoji": "🐠", "keywords": ["fish", "sea", "animal", "aquatic", "swim"] },
     { "emoji": "🦖", "keywords": ["dinosaur", "extinct", "prehistoric", "big", "creature"] },
-    { "emoji": "🐉", "keywords": ["dragon", "mythical", "fire", "fantasy", "power"] }
+    { "emoji": "🐉", "keywords": ["dragon", "mythical", "fire", "fantasy", "power"] },
+    { "emoji": "🦓", "keywords": ["zebra", "wild", "animal", "striped", "africa"] }
   ],
   "food": [
     { "emoji": "🍎", "keywords": ["apple", "fruit", "healthy", "red", "sweet"] },
@@ -57,7 +60,8 @@
     { "emoji": "🥖", "keywords": ["bread", "baguette", "baked", "food", "carbs"] },
     { "emoji": "🍰", "keywords": ["cake", "dessert", "sweet", "birthday", "baked"] },
     { "emoji": "🌭", "keywords": ["hot dog", "fast food", "meat", "snack", "delicious"] },
-    { "emoji": "🥩", "keywords": ["steak", "meat", "food", "grilled", "dinner"] }
+    { "emoji": "🥩", "keywords": ["steak", "meat", "food", "grilled", "dinner"] },
+    { "emoji": "🍒", "keywords": ["cherry", "fruit", "red", "sweet", "tart"] }
   ],
   "actions": [
     { "emoji": "🏃", "keywords": ["run", "exercise", "tired", "activity", "workout"] },
@@ -72,7 +76,8 @@
     { "emoji": "🏊‍♂️", "keywords": ["swimming", "exercise", "water", "sport", "fitness"] },
     { "emoji": "🧗‍♀️", "keywords": ["climbing", "sport", "outdoor", "adventure", "challenge"] },
     { "emoji": "🥋", "keywords": ["martial arts", "karate", "dojo", "fight", "discipline"] },
-    { "emoji": "🛹", "keywords": ["skateboard", "sport", "outdoor", "fun", "ride"] }
+    { "emoji": "🛹", "keywords": ["skateboard", "sport", "outdoor", "fun", "ride"] },
+    { "emoji": "🎮", "keywords": ["video game", "gaming", "controller", "fun", "play"] }
   ],
   "objects": [
     { "emoji": "📱", "keywords": ["phone", "mobile", "technology", "communication", "device"] },
@@ -87,10 +92,7 @@
     { "emoji": "⌚", "keywords": ["watch", "time", "device", "accessory", "wearable"] },
     { "emoji": "🔑", "keywords": ["key", "lock", "door", "security", "access"] },
     { "emoji": "🖥️", "keywords": ["desktop", "computer", "technology", "work", "monitor"] },
-    { "emoji": "🔋", "keywords": ["battery", "power", "charge", "energy", "device"] },
-    { "emoji": "💼", "keywords": ["briefcase", "work", "business", "documents", "office"] },
-    { "emoji": "🕯️", "keywords": ["candle", "light", "warm", "relax", "decor"] },
-    { "emoji": "🧭", "keywords": ["compass", "navigation", "direction", "travel", "explore"] }
+    { "emoji": "🔋", "keywords": ["battery", "power", "charge", "energy", "device"] }
   ],
   "vehicles": [
     { "emoji": "🚗", "keywords": ["car", "vehicle", "drive", "transportation", "automobile"] },
@@ -103,7 +105,6 @@
     { "emoji": "🚤", "keywords": ["speedboat", "water", "vehicle", "fast", "boat"] },
     { "emoji": "🚜", "keywords": ["tractor", "farm", "vehicle", "work", "field"] },
     { "emoji": "🚲", "keywords": ["bicycle", "bike", "ride", "exercise", "transport"] },
-    { "emoji": "🚛", "keywords": ["truck", "transport", "cargo", "vehicle", "delivery"] },
-    { "emoji": "🚁", "keywords": ["helicopter", "aircraft", "vehicle", "flight", "transport"] }
+    { "emoji": "🚛", "keywords": ["truck", "transport", "cargo", "vehicle", "delivery"] }
   ]
 }
