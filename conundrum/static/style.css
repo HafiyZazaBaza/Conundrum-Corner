@@ -290,11 +290,19 @@ button:hover:not(:disabled) {
   }
 }
 
-/* Obviously Lies Game Styles */
+/* ----------------------------------
+   Unified Game UI Styles
+   For all games 
+------------------------------------ */
+
+/* General game UI containers */
 #host-section,
 #question-section,
+#answer-section,
 #player-submit-section,
 #answers-section,
+#submitted-sentences-section,
+#emoji-prompt-section,
 #selection-section,
 #score-section {
   background-color: var(--card);
@@ -306,10 +314,14 @@ button:hover:not(:disabled) {
   transition: box-shadow 0.25s ease;
 }
 
+/* Section headers */
 #host-section h2,
 #question-section h2,
+#answer-section h2,
 #player-submit-section h3,
 #answers-section h3,
+#submitted-sentences-section h3,
+#emoji-prompt-section h2,
 #selection-section h3,
 #score-section h3 {
   color: var(--accent);
@@ -318,6 +330,7 @@ button:hover:not(:disabled) {
   font-weight: 600;
 }
 
+/* Text inputs */
 input[type="text"] {
   width: 100%;
   padding: 12px;
@@ -349,20 +362,16 @@ input[type="text"]:focus {
   user-select: none;
   box-shadow: 0 2px 6px rgba(0, 82, 204, 0.4);
 }
-
 .vote-button:hover:not(:disabled) {
   background-color: var(--vote-button-hover-bg);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 58, 136, 0.6);
 }
-
 .vote-button:disabled {
   cursor: default;
   opacity: 0.6;
   box-shadow: none;
 }
-
-/* Voted state */
 .vote-button.voted {
   background-color: var(--vote-button-voted-bg);
   cursor: default;
@@ -370,28 +379,10 @@ input[type="text"]:focus {
   box-shadow: 0 2px 8px rgba(40,167,69,0.7);
 }
 
-/* Submitted False Answers Live Display */
-#submitted-false-answers {
-  margin-top: 18px;
-  max-height: 180px;
-  overflow-y: auto;
-  font-style: italic;
-  border: var(--card-border);
-  background-color: #fefefe;
-  padding: 14px 18px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  color: var(--accent-dark);
-}
-
-#submitted-false-answers li {
-  margin-bottom: 10px;
-  font-size: 1rem;
-  word-break: break-word;
-}
-
-/* Obviously Lies Submitted Answers container */
-.answer-container {
+/* Unified container for submitted answers or sentences */
+.answer-container,
+.question-container,
+.sentence-container {
   margin-top: 12px;
   padding: 12px 16px;
   background-color: var(--card);
@@ -408,7 +399,9 @@ input[type="text"]:focus {
 
 /* Responsive tweaks */
 @media (max-width: 600px) {
-  .answer-container {
+  .answer-container,
+  .question-container,
+  .sentence-container {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;

@@ -1,97 +1,335 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bad Advice Hotline</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bad Advice Hotline ☎️</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .hidden {
+      display: none;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #submitted-answers-section {
+      background-color: #d9d9d9;
+      border-radius: 20px;
+      padding: 15px;
+      margin-top: 24px;
+      box-shadow: none;
+    }
+
+    .answer-container {
+      background-color: white;
+      color: black;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      padding: 12px 20px;
+      box-shadow: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1.1rem;
+      font-weight: normal;
+    }
+
+    .vote-button {
+      border-radius: 8px;
+      background-color: #8b0000;
+      color: white;
+      padding: 6px 16px;
+      font-weight: 600;
+      cursor: pointer;
+      min-width: 80px;
+      transition: background-color 0.25s ease, transform 0.15s ease;
+      border: none;
+    }
+
+    .vote-button:hover:not(:disabled) {
+      background-color: #5c0000;
+      transform: translateY(-2px);
+    }
+
+    .vote-button:disabled {
+      background-color: #5c0000;
+      cursor: default;
+      opacity: 0.7;
+      box-shadow: none;
+      transform: none;
+    }
+
+    #voted-players-section {
+      background-color: #9ea9c4;
+      border-radius: 20px;
+      padding: 15px;
+      margin-top: 24px;
+      box-shadow: none;
+      color: black;
+    }
+
+    #voted-players-section h3 {
+      margin-bottom: 10px;
+    }
+
+    .voted-player-info {
+      font-style: italic;
+      margin-bottom: 5px;
+    }
+
+    #scores-section {
+      background-color: white;
+      border-radius: 20px;
+      padding: 15px 20px;
+      margin-top: 24px;
+      box-shadow: none;
+      color: black;
+      font-weight: 700;
+    }
+
+    #scores-section h3 {
+      margin-bottom: 10px;
+    }
+
+    #scores-list {
+      list-style-type: none;
+      padding-left: 0;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    #scores-list li {
+      margin-bottom: 6px;
+    }
+
+    #scores-list li[style] {
+      color: #8b0000;
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>☎️ Bad Advice Hotline</h1>
+  <div class="container">
+    <h1>Bad Advice Hotline ☎️</h1>
+    <p>You are: <strong id="userName">{{ username }}</strong></p>
 
-        <!-- Question -->
-        <div id="questionBox" class="card">
-            <h2 id="questionText">Waiting for question...</h2>
-            <button id="startBtn">Start Round</button>
-        </div>
-
-        <!-- Answer submission -->
-        <div id="answerBox" class="card" style="display:none;">
-            <h3>Your Answer</h3>
-            <input type="text" id="answerInput" placeholder="Give terrible advice...">
-            <button id="submitAnswerBtn">Submit</button>
-        </div>
-
-        <!-- Voting phase -->
-        <div id="voteBox" class="card" style="display:none;">
-            <h3>Vote for the worst advice</h3>
-            <ul id="answersList"></ul>
-        </div>
-
-        <!-- Scores -->
-        <div id="scoresBox" class="card" style="display:none;">
-            <h3>Scores</h3>
-            <ul id="scoresList"></ul>
-        </div>
+    <!-- Host Area -->
+    <div id="host-section" class="hidden">
+      <h2>Host: Create Question</h2>
+      <form id="host-form">
+        <label for="question-input">Question:</label>
+        <input id="question-input" type="text" required />
+        <button type="submit">Start Round</button>
+      </form>
     </div>
 
-    <script>
-        const socket = io();
-        const room = "{{ lobby_code }}";  // passed from Flask route
-        const username = "{{ username }}"; // also passed in
+    <!-- Question Section -->
+    <div id="question-section" class="hidden">
+      <h2>Question:</h2>
+      <p id="display-question"></p>
+    </div>
 
-        // Start round
-        document.getElementById("startBtn").addEventListener("click", () => {
-            socket.emit("badadvice_start_round", { room });
+    <!-- Player Area -->
+    <div id="player-submit-section" class="hidden">
+      <h3>Your Bad Advice</h3>
+      <form id="bad-advice-form">
+        <input id="bad-advice-input" type="text" required placeholder="Write your bad advice..." />
+        <button type="submit">Submit Bad Advice</button>
+      </form>
+      <p id="submit-status"></p>
+    </div>
+
+    <!-- Display Submitted Answers -->
+    <div id="submitted-answers-section" class="hidden">
+      <h3>Submitted Bad Advice</h3>
+      <div id="submitted-answers"></div>
+    </div>
+
+    <!-- Players Who Have Voted Section -->
+    <div id="voted-players-section" class="hidden">
+      <h3>Players who have voted</h3>
+      <div id="voted-players-list"></div>
+    </div>
+
+    <!-- Scores Section -->
+    <div id="scores-section" class="hidden">
+      <h3>Scores</h3>
+      <ul id="scores-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const lobbyCode = "{{ lobby_code }}";
+    const username = "{{ username }}";
+    let isHost = false;
+    let question = "";
+    let hasVoted = false;
+    let myBadAdviceAnswers = new Set();
+
+    socket.on("connect", () => {
+      socket.emit("join_lobby", { username, lobbyCode });
+    });
+
+    socket.on("lobby_update", data => {
+      if (data.host === username) {
+        isHost = true;
+        document.getElementById("host-section").classList.remove("hidden");
+      }
+    });
+
+    document.getElementById("host-form").addEventListener("submit", e => {
+      e.preventDefault();
+      question = document.getElementById("question-input").value.trim();
+      if (!question) {
+        alert("Please enter a question.");
+        return;
+      }
+      socket.emit("bad_advice_hotline_start_round", { lobbyCode, question, username });
+    });
+
+    socket.on("bad_advice_hotline_round_started", data => {
+      question = data.question || "";
+      document.getElementById("question-section").classList.remove("hidden");
+      document.getElementById("display-question").textContent = question;
+
+      hasVoted = false;
+      myBadAdviceAnswers.clear();
+
+      if (isHost) {
+        document.getElementById("host-section").classList.add("hidden");
+      } else {
+        document.getElementById("player-submit-section").classList.remove("hidden");
+      }
+      document.getElementById("submit-status").textContent = "";
+      document.getElementById("bad-advice-input").disabled = false;
+      document.querySelector("#bad-advice-form button").disabled = false;
+      document.getElementById("submitted-answers-section").classList.remove("hidden");
+      document.getElementById("voted-players-section").classList.remove("hidden");
+      document.getElementById("scores-section").classList.remove("hidden");
+
+      document.getElementById("submitted-answers").innerHTML = "";
+      document.getElementById("voted-players-list").innerHTML = "";
+      document.getElementById("scores-list").innerHTML = "";
+    });
+
+    document.getElementById("bad-advice-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const badAdvice = document.getElementById("bad-advice-input").value.trim();
+      if (!badAdvice) {
+        alert("Please enter your bad advice.");
+        return;
+      }
+      socket.emit("bad_advice_hotline_submit_bad_advice", { lobbyCode, player: username, badAdvice });
+      document.getElementById("submit-status").textContent = "Submitted!";
+      document.getElementById("bad-advice-input").value = "";
+      document.getElementById("bad-advice-input").disabled = true;
+      e.target.querySelector("button").disabled = true;
+      myBadAdviceAnswers.add(badAdvice);
+    });
+
+    function createAnswerContainer(answer) {
+      const container = document.createElement("div");
+      container.classList.add("answer-container");
+      container.textContent = answer;
+
+      if (!isHost && !hasVoted && !myBadAdviceAnswers.has(answer)) {
+        const voteBtn = document.createElement("button");
+        voteBtn.classList.add("vote-button");
+        voteBtn.textContent = "Vote";
+        voteBtn.disabled = false;
+
+        voteBtn.onclick = () => {
+          if (hasVoted) return;
+          document.querySelectorAll(".vote-button").forEach(btn => btn.disabled = true);
+          socket.emit("bad_advice_hotline_vote", { lobbyCode, player: username, answer });
+        };
+
+        container.appendChild(voteBtn);
+      } else if (hasVoted) {
+        const voteBtn = document.createElement("button");
+        voteBtn.classList.add("vote-button");
+        voteBtn.textContent = "Voted!";
+        voteBtn.disabled = true;
+        container.appendChild(voteBtn);
+      }
+
+      return container;
+    }
+
+    socket.on("bad_advice_hotline_bad_advice_submitted", data => {
+      const answerContainer = createAnswerContainer(data.badAdvice);
+      document.getElementById("submitted-answers").appendChild(answerContainer);
+    });
+
+    socket.on("bad_advice_hotline_all_answers", data => {
+      hasVoted = false;
+      const answersDiv = document.getElementById("submitted-answers");
+      answersDiv.innerHTML = "";
+      data.answers.forEach(answer => {
+        const answerContainer = createAnswerContainer(answer);
+        answersDiv.appendChild(answerContainer);
+      });
+      document.getElementById("voted-players-list").innerHTML = "";
+    });
+
+    socket.on("vote_confirmed", data => {
+      if (data.player === username) {
+        hasVoted = true;
+        document.querySelectorAll(".vote-button").forEach(btn => {
+          btn.disabled = true;
+          btn.textContent = "Voted!";
         });
+      }
+    });
 
-        // Submit answer
-        document.getElementById("submitAnswerBtn").addEventListener("click", () => {
-            const answer = document.getElementById("answerInput").value;
-            socket.emit("badadvice_submit_answer", { room, answer });
-            document.getElementById("answerBox").style.display = "none";
+    socket.on("error_message", data => {
+      if (data.message === "Vote failed or already voted.") {
+        alert("You have already voted and cannot vote again.");
+        hasVoted = true;
+        document.querySelectorAll(".vote-button").forEach(btn => {
+          btn.disabled = true;
+          btn.textContent = "Voted!";
         });
+      }
+    });
 
-        // Vote
-        function castVote(voted_sid) {
-            socket.emit("badadvice_cast_vote", { room, voted_sid });
-            document.getElementById("voteBox").style.display = "none";
+    socket.on("update_votes", data => {
+      const votes = data.votes;
+      const container = document.getElementById("voted-players-list");
+      container.innerHTML = "";
+      Object.entries(votes).forEach(([player, answer]) => {
+        const infoDiv = document.createElement("div");
+        infoDiv.classList.add("voted-player-info");
+        if (player === username) {
+          infoDiv.textContent = `you have voted for ${answer}`;
+        } else {
+          infoDiv.textContent = `${player} have voted for ${answer}`;
         }
+        container.appendChild(infoDiv);
+      });
+    });
 
-        // ===== SOCKET LISTENERS =====
-
-        // New question
-        socket.on("badadvice_new_question", data => {
-            document.getElementById("questionText").innerText = data.question;
-            document.getElementById("answerBox").style.display = "block";
-            document.getElementById("answerInput").value = "";
-        });
-
-        // Voting starts
-        socket.on("badadvice_start_voting", data => {
-            const list = document.getElementById("answersList");
-            list.innerHTML = "";
-            Object.entries(data.answers).forEach(([sid, text]) => {
-                const li = document.createElement("li");
-                li.innerHTML = `${text} <button onclick="castVote('${sid}')">Vote</button>`;
-                list.appendChild(li);
-            });
-            document.getElementById("voteBox").style.display = "block";
-        });
-
-        // Round result
-        socket.on("badadvice_round_result", data => {
-            const scoresList = document.getElementById("scoresList");
-            scoresList.innerHTML = "";
-            Object.entries(data.scores).forEach(([user, score]) => {
-                const li = document.createElement("li");
-                li.innerText = `${user}: ${score}`;
-                scoresList.appendChild(li);
-            });
-            document.getElementById("scoresBox").style.display = "block";
-        });
-    </script>
+    socket.on("update_scores", data => {
+      const scores = data.scores;
+      const scoresList = document.getElementById("scores-list");
+      scoresList.innerHTML = "";
+      Object.entries(scores).forEach(([player, score]) => {
+        const li = document.createElement("li");
+        li.textContent = `${player}: ${score} point${score !== 1 ? "s" : ""}`;
+        if (player === username) {
+          li.style.fontWeight = "bold";
+          li.style.color = "#8b0000";
+        }
+        scoresList.appendChild(li);
+      });
+    });
+  </script>
 </body>
+
 </html>
