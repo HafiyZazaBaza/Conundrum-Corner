@@ -17,7 +17,7 @@
       cursor: not-allowed;
     }
 
-    #submitted-sentences-section {
+    #submitted-guesses-section {
       background-color: #d9d9d9;
       border-radius: 20px;
       padding: 15px;
@@ -25,7 +25,7 @@
       box-shadow: none;
     }
 
-    .sentence-container {
+    .guess-container {
       background-color: white;
       color: black;
       border-radius: 12px;
@@ -41,7 +41,7 @@
 
     .vote-button {
       border-radius: 8px;
-      background-color: #005500;
+      background-color: #002b66;
       color: white;
       padding: 6px 16px;
       font-weight: 600;
@@ -52,12 +52,12 @@
     }
 
     .vote-button:hover:not(:disabled) {
-      background-color: #003300;
+      background-color: #001f4d;
       transform: translateY(-2px);
     }
 
     .vote-button:disabled {
-      background-color: #003300;
+      background-color: #001f4d;
       cursor: default;
       opacity: 0.7;
       box-shadow: none;
@@ -108,21 +108,36 @@
     }
 
     #scores-list li[style] {
-      color: #005500;
+      color: #002b66;
     }
 
-    .emoji-prompt-container {
-      background-color: white;
-      border-radius: 12px;
-      padding: 15px;
-      margin-top: 24px;
-      box-shadow: none;
-      text-align: center;
+    /* Emoji picker styles */
+    #emoji-picker {
+      border: 1px solid #ccc;
+      max-height: 120px;
+      overflow-y: auto;
+      background: white;
+      padding: 5px;
+      margin-top: 6px;
+      border-radius: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      user-select: none;
     }
 
-    #display-emoji-prompt {
-      font-size: 2rem;
-      font-weight: bold;
+    #emoji-picker button {
+      font-size: 24px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      transition: background-color 0.2s ease;
+    }
+
+    #emoji-picker button:hover {
+      background-color: #dde4f0;
     }
   </style>
 </head>
@@ -134,41 +149,38 @@
 
     <!-- Host Area -->
     <div id="host-section" class="hidden">
-      <h2>Host: Create Emoji Prompt</h2>
-      <form id="host-form">
-        <label for="emoji-input">Emoji Prompt:</label>
-        <input id="emoji-input" type="text" required placeholder="e.g. 🍎📚🐱" />
-        <label for="correct-sentence-input">Correct Sentence:</label>
-        <input id="correct-sentence-input" type="text" required placeholder="Sentence translation..." />
+      <h2>Host: Enter Emoji Prompt</h2>
+      <form id="host-form" autocomplete="off" novalidate>
+        <label for="emoji-prompt-input">Emoji Prompt:</label>
+        <input id="emoji-prompt-input" type="text" required placeholder="Enter emoji sequence or keyword..." />
+        <div id="emoji-picker" class="hidden"></div>
         <button type="submit">Start Round</button>
       </form>
     </div>
 
-    <!-- Emoji Prompt Section with Container -->
+    <!-- Emoji Prompt Display -->
     <div id="emoji-prompt-section" class="hidden">
-      <div class="emoji-prompt-container">
-        <h2>Emoji Prompt:</h2>
-        <p id="display-emoji-prompt"></p>
-      </div>
+      <h2>Emoji Prompt:</h2>
+      <p id="display-emoji-prompt" style="font-size: 2rem;"></p>
     </div>
 
     <!-- Player Area -->
     <div id="player-submit-section" class="hidden">
-      <h3>Your Sentence Guess</h3>
-      <form id="sentence-submit-form">
-        <input id="sentence-input" type="text" required placeholder="Write your sentence guess..." />
-        <button type="submit">Submit Sentence</button>
+      <h3>Your Guess</h3>
+      <form id="guess-form">
+        <input id="guess-input" type="text" required placeholder="Translate the emoji prompt..." />
+        <button type="submit">Submit Guess</button>
       </form>
       <p id="submit-status"></p>
     </div>
 
-    <!-- Display Submitted Sentences -->
-    <div id="submitted-sentences-section" class="hidden">
-      <h3>Submitted Sentences</h3>
-      <div id="submitted-sentences"></div>
+    <!-- Display Submitted Guesses -->
+    <div id="submitted-guesses-section" class="hidden">
+      <h3>Submitted Guesses</h3>
+      <div id="submitted-guesses"></div>
     </div>
 
-    <!-- Players Who Have Voted -->
+    <!-- Players Who Have Voted Section -->
     <div id="voted-players-section" class="hidden">
       <h3>Players who have voted</h3>
       <div id="voted-players-list"></div>
@@ -182,14 +194,203 @@
   </div>
 
   <script>
+    // Emoji dataset like your emoji.json structure embedded here:
+    const emojiData = {
+      "emotions": [
+    { "emoji": "😊", "keywords": ["smile", "happy", "joyful", "friendly", "content"] },
+    { "emoji": "😂", "keywords": ["laughing", "tears of joy", "funny", "hilarious", "joke", "funny"] },
+    { "emoji": "😢", "keywords": ["sad", "crying", "tear", "upset", "emotional"] },
+    { "emoji": "😎", "keywords": ["cool", "sunglasses", "confident", "chill", "style"] },
+    { "emoji": "😩", "keywords": ["weary", "tired", "exhausted", "overwhelmed", "stress"] },
+    { "emoji": "😍", "keywords": ["love", "heart", "romantic", "affection", "attracted"] },
+    { "emoji": "😱", "keywords": ["scared", "fear", "horror", "shocked", "panic"] },
+    { "emoji": "😡", "keywords": ["angry", "frustrated", "mad", "annoyed", "rage", "upset"] },
+    { "emoji": "🥳", "keywords": ["celebrate", "party", "happy", "excited", "joy"] },
+    { "emoji": "🤔", "keywords": ["thinking", "curious", "question", "ponder", "wonder"] },
+    { "emoji": "😴", "keywords": ["sleepy", "tired", "rest", "nap", "zzz"] },
+    { "emoji": "😭", "keywords": ["crying", "sad", "tear", "upset", "emotional"] },
+    { "emoji": "🤗", "keywords": ["hug", "warm", "friendly", "affection", "welcome"] },
+    { "emoji": "😇", "keywords": ["angel", "innocent", "good", "pure", "halo"] },
+    { "emoji": "😜", "keywords": ["playful", "winking", "tongue out", "funny", "silly"] },
+    { "emoji": "💀", "keywords": ["skeleton", "death", "spooky", "halloween", "scary"] },
+    { "emoji": "👻", "keywords": ["ghost", "spooky", "scary", "halloween", "funny ghost"] },
+    { "emoji": "🤡", "keywords": ["clown", "funny", "creepy", "circus", "joker"] },
+    { "emoji": "😳", "keywords": ["embarrassed", "blushing", "shy", "awkward"] },
+    { "emoji": "🥺", "keywords": ["pleading", "puppy eyes", "soft", "cute", "emotion"] }
+  ],
+  "animals": [
+    { "emoji": "🐶", "keywords": ["dog", "puppy", "pet", "canine", "animal"] },
+    { "emoji": "🐈", "keywords": ["cat", "kitten", "pet", "feline", "purring"] },
+    { "emoji": "🦁", "keywords": ["lion", "wild", "animal", "brave", "king"] },
+    { "emoji": "🐯", "keywords": ["tiger", "wild", "animal", "fierce", "powerful"] },
+    { "emoji": "🐰", "keywords": ["rabbit", "bunny", "cute", "animal", "fluffy"] },
+    { "emoji": "🐼", "keywords": ["panda", "bear", "cute", "black and white", "animal"] },
+    { "emoji": "🦊", "keywords": ["fox", "animal", "wild", "sly", "cute"] },
+    { "emoji": "🦉", "keywords": ["owl", "bird", "wise", "night", "animal"] },
+    { "emoji": "🐧", "keywords": ["penguin", "bird", "cute", "cold", "animal"] },
+    { "emoji": "🐸", "keywords": ["frog", "amphibian", "green", "animal", "jump"] },
+    { "emoji": "🦄", "keywords": ["unicorn", "mythical", "fantasy", "magical", "cute"] },
+    { "emoji": "🐢", "keywords": ["turtle", "slow", "animal", "shell", "cute"] },
+    { "emoji": "🐨", "keywords": ["koala", "cute", "animal", "tree", "marsupial"] },
+    { "emoji": "🐙", "keywords": ["octopus", "sea", "animal", "tentacles", "ocean"] },
+    { "emoji": "🦀", "keywords": ["crab", "sea", "animal", "pincher", "ocean"] },
+    { "emoji": "🐠", "keywords": ["fish", "sea", "animal", "aquatic", "swim"] },
+    { "emoji": "🦖", "keywords": ["dinosaur", "extinct", "prehistoric", "big", "creature"] },
+    { "emoji": "🐉", "keywords": ["dragon", "mythical", "fire", "fantasy", "power"] },
+    { "emoji": "🦓", "keywords": ["zebra", "wild", "animal", "striped", "africa"] }
+  ],
+  "food": [
+    { "emoji": "🍎", "keywords": ["apple", "fruit", "healthy", "red", "sweet"] },
+    { "emoji": "🍔", "keywords": ["burger", "food", "fast food", "delicious", "cheese"] },
+    { "emoji": "🍕", "keywords": ["pizza", "food", "cheese", "slice", "delicious"] },
+    { "emoji": "🍩", "keywords": ["donut", "sweet", "dessert", "glazed", "sugar"] },
+    { "emoji": "🍦", "keywords": ["ice cream", "dessert", "cold", "sweet", "chocolate"] },
+    { "emoji": "🍪", "keywords": ["cookie", "dessert", "sweet", "chocolate chip", "baked"] },
+    { "emoji": "🌮", "keywords": ["taco", "mexican", "food", "spicy", "delicious"] },
+    { "emoji": "🥗", "keywords": ["salad", "healthy", "food", "green", "vegetable"] },
+    { "emoji": "🍓", "keywords": ["strawberry", "fruit", "berry", "sweet", "red"] },
+    { "emoji": "🍉", "keywords": ["watermelon", "fruit", "summer", "sweet", "red"] },
+    { "emoji": "🍗", "keywords": ["chicken leg", "meat", "food", "dinner", "drumstick"] },
+    { "emoji": "🥑", "keywords": ["avocado", "fruit", "healthy", "green", "smoothie"] },
+    { "emoji": "🍣", "keywords": ["sushi", "japanese", "food", "rice", "fish"] },
+    { "emoji": "🍜", "keywords": ["ramen", "noodles", "soup", "food", "japanese"] },
+    { "emoji": "🥖", "keywords": ["bread", "baguette", "baked", "food", "carbs"] },
+    { "emoji": "🍰", "keywords": ["cake", "dessert", "sweet", "birthday", "baked"] },
+    { "emoji": "🌭", "keywords": ["hot dog", "fast food", "meat", "snack", "delicious"] },
+    { "emoji": "🥩", "keywords": ["steak", "meat", "food", "grilled", "dinner"] },
+    { "emoji": "🍒", "keywords": ["cherry", "fruit", "red", "sweet", "tart"] }
+  ],
+  "actions": [
+    { "emoji": "🏃", "keywords": ["run", "exercise", "tired", "activity", "workout"] },
+    { "emoji": "💃", "keywords": ["dance", "dancing", "party", "movement", "happy", "fun"] },
+    { "emoji": "🤸‍♀️", "keywords": ["cartwheel", "gymnastics", "exercise", "movement", "activity"] },
+    { "emoji": "🚶‍♀️", "keywords": ["walk", "exercise", "stroll", "tired", "movement"] },
+    { "emoji": "🧘‍♂️", "keywords": ["yoga", "stretch", "meditation", "relax", "peace"] },
+    { "emoji": "🤼‍♂️", "keywords": ["wrestling", "sport", "fight", "strength", "activity"] },
+    { "emoji": "🤾‍♀️", "keywords": ["handball", "sport", "game", "exercise", "team"] },
+    { "emoji": "🤹‍♂️", "keywords": ["juggling", "circus", "entertainment", "skill", "fun"] },
+    { "emoji": "🚴‍♀️", "keywords": ["bike", "cycling", "exercise", "outdoor", "fitness"] },
+    { "emoji": "🏊‍♂️", "keywords": ["swimming", "exercise", "water", "sport", "fitness"] },
+    { "emoji": "🧗‍♀️", "keywords": ["climbing", "sport", "outdoor", "adventure", "challenge"] },
+    { "emoji": "🥋", "keywords": ["martial arts", "karate", "dojo", "fight", "discipline"] },
+    { "emoji": "🛹", "keywords": ["skateboard", "sport", "outdoor", "fun", "ride"] },
+    { "emoji": "🎮", "keywords": ["video game", "gaming", "controller", "fun", "play"] }
+  ],
+  "objects": [
+    { "emoji": "📱", "keywords": ["phone", "mobile", "technology", "communication", "device"] },
+    { "emoji": "💻", "keywords": ["laptop", "computer", "technology", "work", "internet"] },
+    { "emoji": "🎮", "keywords": ["video game", "gaming", "controller", "fun", "play"] },
+    { "emoji": "📷", "keywords": ["camera", "photography", "photo", "picture", "capture"] },
+    { "emoji": "💡", "keywords": ["light", "bulb", "idea", "energy", "brightness"] },
+    { "emoji": "📚", "keywords": ["books", "reading", "study", "education", "learning"] },
+    { "emoji": "🎧", "keywords": ["headphones", "music", "sound", "listen", "audio"] },
+    { "emoji": "📦", "keywords": ["box", "package", "delivery", "shipment", "cargo"] },
+    { "emoji": "🔒", "keywords": ["lock", "security", "protected", "key", "safe"] },
+    { "emoji": "⌚", "keywords": ["watch", "time", "device", "accessory", "wearable"] },
+    { "emoji": "🔑", "keywords": ["key", "lock", "door", "security", "access"] },
+    { "emoji": "🖥️", "keywords": ["desktop", "computer", "technology", "work", "monitor"] },
+    { "emoji": "🔋", "keywords": ["battery", "power", "charge", "energy", "device"] }
+  ],
+  "vehicles": [
+    { "emoji": "🚗", "keywords": ["car", "vehicle", "drive", "transportation", "automobile"] },
+    { "emoji": "🚌", "keywords": ["bus", "vehicle", "public transport", "ride", "commute"] },
+    { "emoji": "🚀", "keywords": ["rocket", "space", "travel", "explore", "fast"] },
+    { "emoji": "🚂", "keywords": ["train", "vehicle", "transport", "rail", "journey"] },
+    { "emoji": "🚁", "keywords": ["helicopter", "aircraft", "vehicle", "flight", "transport"] },
+    { "emoji": "🛴", "keywords": ["scooter", "vehicle", "transport", "ride", "fun"] },
+    { "emoji": "🛵", "keywords": ["motorcycle", "bike", "vehicle", "ride", "fast"] },
+    { "emoji": "🚤", "keywords": ["speedboat", "water", "vehicle", "fast", "boat"] },
+    { "emoji": "🚜", "keywords": ["tractor", "farm", "vehicle", "work", "field"] },
+    { "emoji": "🚲", "keywords": ["bicycle", "bike", "ride", "exercise", "transport"] },
+    { "emoji": "🚛", "keywords": ["truck", "transport", "cargo", "vehicle", "delivery"] }
+  ]
+      // You can add other categories similarly...
+    };
+
+    // Flatten emojiData for easier keyword lookup
+    const keywordToEmojiMap = {};
+    for (const category in emojiData) {
+      emojiData[category].forEach(({ emoji, keywords }) => {
+        keywords.forEach(keyword => {
+          keywordToEmojiMap[keyword.toLowerCase()] = emoji;
+        });
+      });
+    }
+
     const socket = io();
     const lobbyCode = "{{ lobby_code }}";
     const username = "{{ username }}";
+
     let isHost = false;
     let emojiPrompt = "";
-    let correctSentence = "";
     let hasVoted = false;
-    let mySubmittedSentences = new Set();
+    let myGuesses = new Set();
+
+    // Elements
+    const hostSection = document.getElementById('host-section');
+    const emojiInput = document.getElementById('emoji-prompt-input');
+    const emojiPicker = document.getElementById('emoji-picker');
+
+    // Populate emoji picker buttons from emojiData
+    function populateEmojiPicker() {
+      emojiPicker.innerHTML = '';
+      for (const category in emojiData) {
+        emojiData[category].forEach(({ emoji }) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = emoji;
+          btn.title = emoji; // Could add more info on hover if desired
+          btn.onclick = () => {
+            // Insert emoji at cursor position in input
+            insertAtCursor(emojiInput, emoji);
+            emojiInput.focus();
+          };
+          emojiPicker.appendChild(btn);
+        });
+      }
+    }
+
+    // Insert text at cursor position in an input or textarea
+    function insertAtCursor(input, text) {
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const before = input.value.substring(0, start);
+      const after = input.value.substring(end);
+      input.value = before + text + after;
+      const newPos = start + text.length;
+      input.setSelectionRange(newPos, newPos);
+    }
+
+    // When emoji input gets focus, show emoji picker, else hide it
+    emojiInput.addEventListener('focus', () => {
+      emojiPicker.classList.remove('hidden');
+      if (emojiPicker.children.length === 0) { // populate only once
+        populateEmojiPicker();
+      }
+    });
+
+    emojiInput.addEventListener('blur', () => {
+      // Delay hiding so click on emoji buttons registers
+      setTimeout(() => {
+        emojiPicker.classList.add('hidden');
+      }, 200);
+    });
+
+    // Convert keywords to emojis as the host types
+    emojiInput.addEventListener('input', () => {
+      // Basic approach: replace whole words that match keywords with emojis
+
+      // Split text by spaces/punctuation (simple split)
+      let words = emojiInput.value.split(/\b/);
+
+      words = words.map(word => {
+        const lowerWord = word.toLowerCase();
+        return keywordToEmojiMap[lowerWord] || word;
+      });
+
+      // Join back the text preserving spaces/punctuation
+      emojiInput.value = words.join('');
+    });
 
     socket.on("connect", () => {
       socket.emit("join_lobby", { username, lobbyCode });
@@ -198,67 +399,66 @@
     socket.on("lobby_update", data => {
       if (data.host === username) {
         isHost = true;
-        document.getElementById("host-section").classList.remove("hidden");
+        hostSection.classList.remove("hidden");
       }
     });
 
     document.getElementById("host-form").addEventListener("submit", e => {
       e.preventDefault();
-      emojiPrompt = document.getElementById("emoji-input").value.trim();
-      correctSentence = document.getElementById("correct-sentence-input").value.trim();
-      if (!emojiPrompt || !correctSentence) {
-        alert("Please enter both emoji prompt and correct sentence.");
+      emojiPrompt = emojiInput.value.trim();
+      if (!emojiPrompt) {
+        alert("Please enter an emoji prompt.");
         return;
       }
-      socket.emit("emoji_translation_start_round", { lobbyCode, emojiPrompt, correctSentence, username });
+      socket.emit("emoji_translation_start_round", { lobbyCode, emojiPrompt, username });
     });
 
     socket.on("emoji_translation_round_started", data => {
-      emojiPrompt = data.emojiPrompt || "";
+      emojiPrompt = data.emoji_prompt || "";
       document.getElementById("emoji-prompt-section").classList.remove("hidden");
       document.getElementById("display-emoji-prompt").textContent = emojiPrompt;
 
       hasVoted = false;
-      mySubmittedSentences.clear();
+      myGuesses.clear();
 
       if (isHost) {
-        document.getElementById("host-section").classList.add("hidden");
+        hostSection.classList.add("hidden");
       } else {
         document.getElementById("player-submit-section").classList.remove("hidden");
       }
       document.getElementById("submit-status").textContent = "";
-      document.getElementById("sentence-input").disabled = false;
-      document.querySelector("#sentence-submit-form button").disabled = false;
-      document.getElementById("submitted-sentences-section").classList.remove("hidden");
+      document.getElementById("guess-input").disabled = false;
+      document.querySelector("#guess-form button").disabled = false;
+      document.getElementById("submitted-guesses-section").classList.remove("hidden");
       document.getElementById("voted-players-section").classList.remove("hidden");
       document.getElementById("scores-section").classList.remove("hidden");
 
-      document.getElementById("submitted-sentences").innerHTML = "";
+      document.getElementById("submitted-guesses").innerHTML = "";
       document.getElementById("voted-players-list").innerHTML = "";
       document.getElementById("scores-list").innerHTML = "";
     });
 
-    document.getElementById("sentence-submit-form").addEventListener("submit", e => {
+    document.getElementById("guess-form").addEventListener("submit", e => {
       e.preventDefault();
-      const sentence = document.getElementById("sentence-input").value.trim();
-      if (!sentence) {
-        alert("Please enter a sentence.");
+      const guess = document.getElementById("guess-input").value.trim();
+      if (!guess) {
+        alert("Please enter your guess.");
         return;
       }
-      socket.emit("emoji_translation_submit_sentence", { lobbyCode, player: username, sentence });
+      socket.emit("emoji_translation_submit_guess", { lobbyCode, player: username, guess });
       document.getElementById("submit-status").textContent = "Submitted!";
-      document.getElementById("sentence-input").value = "";
-      document.getElementById("sentence-input").disabled = true;
+      document.getElementById("guess-input").value = "";
+      document.getElementById("guess-input").disabled = true;
       e.target.querySelector("button").disabled = true;
-      mySubmittedSentences.add(sentence);
+      myGuesses.add(guess);
     });
 
-    function createSentenceContainer(sentence) {
+    function createGuessContainer(guess) {
       const container = document.createElement("div");
-      container.classList.add("sentence-container");
-      container.textContent = sentence;
+      container.classList.add("guess-container");
+      container.textContent = guess;
 
-      if (!isHost && !hasVoted && !mySubmittedSentences.has(sentence)) {
+      if (!isHost && !hasVoted && !myGuesses.has(guess)) {
         const voteBtn = document.createElement("button");
         voteBtn.classList.add("vote-button");
         voteBtn.textContent = "Vote";
@@ -267,7 +467,7 @@
         voteBtn.onclick = () => {
           if (hasVoted) return;
           document.querySelectorAll(".vote-button").forEach(btn => btn.disabled = true);
-          socket.emit("emoji_translation_vote", { lobbyCode, player: username, sentence });
+          socket.emit("emoji_translation_vote", { lobbyCode, player: username, guess });
         };
 
         container.appendChild(voteBtn);
@@ -282,18 +482,18 @@
       return container;
     }
 
-    socket.on("emoji_translation_sentence_submitted", data => {
-      const container = createSentenceContainer(data.sentence);
-      document.getElementById("submitted-sentences").appendChild(container);
+    socket.on("emoji_translation_guess_submitted", data => {
+      const guessContainer = createGuessContainer(data.guess);
+      document.getElementById("submitted-guesses").appendChild(guessContainer);
     });
 
-    socket.on("emoji_translation_all_sentences", data => {
+    socket.on("emoji_translation_all_guesses", data => {
       hasVoted = false;
-      const sentencesDiv = document.getElementById("submitted-sentences");
-      sentencesDiv.innerHTML = "";
-      data.sentences.forEach(sentence => {
-        const container = createSentenceContainer(sentence);
-        sentencesDiv.appendChild(container);
+      const guessesDiv = document.getElementById("submitted-guesses");
+      guessesDiv.innerHTML = "";
+      data.guesses.forEach(guess => {
+        const guessContainer = createGuessContainer(guess);
+        guessesDiv.appendChild(guessContainer);
       });
       document.getElementById("voted-players-list").innerHTML = "";
     });
@@ -323,14 +523,12 @@
       const votes = data.votes;
       const container = document.getElementById("voted-players-list");
       container.innerHTML = "";
-      Object.entries(votes).forEach(([player, sentence]) => {
+      Object.entries(votes).forEach(([player, guess]) => {
         const infoDiv = document.createElement("div");
         infoDiv.classList.add("voted-player-info");
-        if (player === username) {
-          infoDiv.textContent = `you have voted for "${sentence}"`;
-        } else {
-          infoDiv.textContent = `${player} has voted for "${sentence}"`;
-        }
+        infoDiv.textContent = player === username
+          ? `you have voted for ${guess}`
+          : `${player} has voted for ${guess}`;
         container.appendChild(infoDiv);
       });
     });
@@ -344,7 +542,7 @@
         li.textContent = `${player}: ${score} point${score !== 1 ? "s" : ""}`;
         if (player === username) {
           li.style.fontWeight = "bold";
-          li.style.color = "#005500";
+          li.style.color = "#002b66";
         }
         scoresList.appendChild(li);
       });

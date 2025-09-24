@@ -5,60 +5,55 @@ class EmojiTranslationGame:
         # Stores game state keyed by lobby_code
         self.games = {}
 
-    def start_round(self, lobby_code, emoji_prompt, correct_sentence, players, host=None):
+    def start_round(self, lobby_code, emoji_prompt, players, host=None):
         # Exclude host from players eligible for scoring
         eligible_players = set(players) - {host} if host else set(players)
         self.games[lobby_code] = {
-            "emoji_prompt": emoji_prompt,
-            "correct_sentence": correct_sentence,
+            "emoji_prompt": emoji_prompt,          # The emoji string input by host
             "players": set(players),
-            "submitted_sentences": {},  # player -> sentence guess
+            "guesses": {},                         # player -> guessed sentence
             "finished_submitting": set(),
-            "votes": {correct_sentence: set()},  # sentence -> set of players who voted for it
-            "sentence_to_player": {correct_sentence: None},  # sentence -> submitting player (None for correct)
+            "votes": {},                          # guess -> set of players who voted for it
+            "guess_to_player": {},                 # guess -> player who submitted it
             "scores": {player: 0 for player in eligible_players},  # only non-host players score
             "host": host,
         }
 
-    def submit_sentence(self, lobby_code, player, sentence):
+    def submit_guess(self, lobby_code, player, guess):
         game = self.games.get(lobby_code)
         if not game:
             return False
-        if player in game["players"] and player not in game["submitted_sentences"]:
-            game["submitted_sentences"][player] = sentence
+        if player in game["players"] and player not in game["guesses"]:
+            game["guesses"][player] = guess
             game["finished_submitting"].add(player)
-            if sentence not in game["votes"]:
-                game["votes"][sentence] = set()
-            # Track which player submitted which sentence
-            game["sentence_to_player"][sentence] = player
+            if guess not in game["votes"]:
+                game["votes"][guess] = set()
+            game["guess_to_player"][guess] = player
             return True
         return False
 
-    def all_sentences_submitted(self, lobby_code):
+    def all_guesses_submitted(self, lobby_code):
         game = self.games.get(lobby_code)
         if not game:
             return False
-        return game["finished_submitting"] == game["players"]
+        # All players except the host must submit guess
+        players_to_submit = game["players"] - {game["host"]} if game["host"] else game["players"]
+        return game["finished_submitting"] == players_to_submit
 
-    def get_all_sentences(self, lobby_code):
+    def get_all_guesses(self, lobby_code):
         game = self.games.get(lobby_code)
         if not game:
             return []
-        # Ensure all submitted sentences are in votes dict
-        for sentence in game["submitted_sentences"].values():
-            if sentence not in game["votes"]:
-                game["votes"][sentence] = set()
-        result = list(game["submitted_sentences"].values())
-        result.append(game["correct_sentence"])
-        return sorted(result)
+        # Return all guesses submitted sorted alphabetically
+        return sorted(game["guesses"].values())
 
-    def get_votes_for_sentence(self, lobby_code, sentence):
+    def get_votes_for_guess(self, lobby_code, guess):
         game = self.games.get(lobby_code)
         if not game:
             return 0
-        return len(game["votes"].get(sentence, []))
+        return len(game["votes"].get(guess, []))
 
-    def cast_vote(self, lobby_code, player, sentence):
+    def cast_vote(self, lobby_code, player, guess):
         game = self.games.get(lobby_code)
         if not game:
             return False
@@ -67,27 +62,22 @@ class EmojiTranslationGame:
         # Host cannot vote
         if player == game.get("host"):
             return False
-        # Player can only vote once per round
+        # Player can vote only once per round
         for voters in game["votes"].values():
             if player in voters:
                 return False
-        # Check if sentence is valid in this round
-        if sentence not in game["votes"]:
+        if guess not in game["votes"]:
             return False
-        # Prevent voting on one's own sentence guess
-        sentence_owner = game["sentence_to_player"].get(sentence)
-        if sentence_owner == player:
+        # Prevent voting on one's own guess
+        guess_owner = game["guess_to_player"].get(guess)
+        if guess_owner == player:
             return False
-        # Cast the vote
-        game["votes"][sentence].add(player)
+        # Cast vote
+        game["votes"][guess].add(player)
 
-        # Update scores:
-        # If voted a non-correct sentence, owner of that sentence gets a point (if not host)
-        if sentence_owner is not None and sentence_owner != game.get("host"):
-            game["scores"][sentence_owner] += 1
-        # If voted the correct sentence, voter gets a point (if not host)
-        if sentence == game["correct_sentence"] and player != game.get("host"):
-            game["scores"][player] += 1
+        # Owner of the guess gets a point when their guess is voted
+        if guess_owner and guess_owner != game.get("host"):
+            game["scores"][guess_owner] += 1
 
         return True
 
@@ -100,11 +90,11 @@ class EmojiTranslationGame:
                 return True
         return False
 
-    def get_submitted_sentences(self, lobby_code):
+    def get_submitted_guesses(self, lobby_code):
         game = self.games.get(lobby_code)
         if not game:
             return {}
-        return game.get("submitted_sentences", {})
+        return game.get("guesses", {})
 
     def get_scores(self, lobby_code):
         game = self.games.get(lobby_code)
@@ -113,13 +103,13 @@ class EmojiTranslationGame:
         return game.get("scores", {})
 
     def end_round(self, lobby_code):
-        """Finalize round but do not delete scores (RoundManager decides if game ends)."""
+        """Finalize round but do not delete scores."""
         game = self.games.get(lobby_code)
         if not game:
             return {}
         summary = {
             "scores": game["scores"].copy(),
-            "votes": {sentence: list(voters) for sentence, voters in game["votes"].items()},
+            "votes": {guess: list(voters) for guess, voters in game["votes"].items()},
         }
         return summary
 
@@ -129,8 +119,8 @@ class EmojiTranslationGame:
         if not game:
             return
         game.update({
-            "submitted_sentences": {},
+            "guesses": {},
             "finished_submitting": set(),
-            "votes": {game["correct_sentence"]: set()},
-            "sentence_to_player": {game["correct_sentence"]: None},
+            "votes": {},
+            "guess_to_player": {},
         })

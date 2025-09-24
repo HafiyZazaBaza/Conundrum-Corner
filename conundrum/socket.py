@@ -472,14 +472,13 @@ def reverse_guessing_vote(data):
 def emoji_translation_start_round(data):
     lobby_code = data.get("lobbyCode")
     emoji_prompt = data.get("emojiPrompt")
-    correct_sentence = data.get("correctSentence")
     username = data.get("username")
 
     if not lobby_code or lobby_code not in lobbies:
         emit("error_message", {"message": "Lobby not found."}, room=request.sid)
         return
-    if not emoji_prompt or not correct_sentence:
-        emit("error_message", {"message": "Emoji prompt and correct sentence required."}, room=request.sid)
+    if not emoji_prompt:
+        emit("error_message", {"message": "Emoji prompt is required."}, room=request.sid)
         return
 
     lobby = lobbies[lobby_code]
@@ -490,47 +489,47 @@ def emoji_translation_start_round(data):
     players = set(lobby["players"])
     host = lobby["host"]
 
-    emoji_translation_game_manager.start_round(lobby_code, emoji_prompt, correct_sentence, players, host)
+    emoji_translation_game_manager.start_round(lobby_code, emoji_prompt, players, host)
 
     lobby_votes[lobby_code] = {}
 
-    emit("emoji_translation_round_started", {"emojiPrompt": emoji_prompt}, room=lobby_code)
-    emit("emoji_translation_all_sentences", {"sentences": [correct_sentence]}, room=lobby_code)
+    emit("emoji_translation_round_started", {"emoji_prompt": emoji_prompt}, room=lobby_code)
+    emit("emoji_translation_all_guesses", {"guesses": []}, room=lobby_code)
 
 
-@socketio.on("emoji_translation_submit_sentence")
-def emoji_translation_submit_sentence(data):
+@socketio.on("emoji_translation_submit_guess")
+def emoji_translation_submit_guess(data):
     lobby_code = data.get("lobbyCode")
     player = data.get("player")
-    sentence = data.get("sentence")
+    guess = data.get("guess")
 
     if not lobby_code or not emoji_translation_game_manager.games.get(lobby_code):
         emit("error_message", {"message": "Round not found."}, room=request.sid)
         return
 
-    censored, violations = pf.clean(sentence)
+    censored, violations = pf.clean(guess)
 
-    success = emoji_translation_game_manager.submit_sentence(lobby_code, player, censored)
+    success = emoji_translation_game_manager.submit_guess(lobby_code, player, censored)
     if not success:
-        emit("error_message", {"message": "Failed to submit sentence."}, room=request.sid)
+        emit("error_message", {"message": "Failed to submit guess."}, room=request.sid)
         return
 
-    emit("emoji_translation_sentence_submitted", {"sentence": censored, "violations": violations}, room=lobby_code)
+    emit("emoji_translation_guess_submitted", {"guess": censored, "violations": violations}, room=lobby_code)
 
-    player_sentences = emoji_translation_game_manager.get_submitted_sentences(lobby_code)
-    emit("player_own_sentences", {"sentences": [s for p, s in player_sentences.items() if p == player]}, room=request.sid)
+    player_guesses = emoji_translation_game_manager.get_submitted_guesses(lobby_code)
+    emit("player_own_guesses", {"guesses": [g for p, g in player_guesses.items() if p == player]}, room=request.sid)
 
-    if emoji_translation_game_manager.all_sentences_submitted(lobby_code):
-        all_sentences = emoji_translation_game_manager.get_all_sentences(lobby_code)
-        random.shuffle(all_sentences)
-        emit("emoji_translation_all_sentences", {"sentences": all_sentences}, room=lobby_code)
+    if emoji_translation_game_manager.all_guesses_submitted(lobby_code):
+        all_guesses = emoji_translation_game_manager.get_all_guesses(lobby_code)
+        random.shuffle(all_guesses)
+        emit("emoji_translation_all_guesses", {"guesses": all_guesses}, room=lobby_code)
 
 
 @socketio.on("emoji_translation_vote")
 def emoji_translation_vote(data):
     lobby_code = data.get("lobbyCode")
     player = data.get("player")
-    sentence = data.get("sentence")
+    guess = data.get("guess")
 
     if not lobby_code or lobby_code not in lobbies:
         emit("error_message", {"message": "Lobby not found."}, room=request.sid)
@@ -547,10 +546,10 @@ def emoji_translation_vote(data):
         emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
         return
 
-    success = emoji_translation_game_manager.cast_vote(lobby_code, player, sentence)
+    success = emoji_translation_game_manager.cast_vote(lobby_code, player, guess)
     if success:
-        current_votes[player] = sentence
-        emit("vote_confirmed", {"sentence": sentence, "player": player}, room=request.sid)
+        current_votes[player] = guess
+        emit("vote_confirmed", {"guess": guess, "player": player}, room=request.sid)
         emit("update_votes", {"votes": current_votes}, room=lobby_code)
         scores = emoji_translation_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
