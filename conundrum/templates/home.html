@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,9 +8,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
+
 <body>
     <div class="container">
-        <h1>🎮 CONUNDRUM CORNER</h1>
+        <h1>🎮 Conundrum Corner</h1>
 
         <div class="forms-wrapper">
             <!-- Create Lobby -->
@@ -20,7 +22,7 @@
                     <input id="create-username" type="text" name="username" placeholder="Enter your name" required>
 
                     <label for="create-max-players">Number of Players</label>
-                    <input id="create-max-players" type="number" name="max_players" placeholder="2–10" min="2" max="10">
+                    <input id="create-max-players" type="number" name="max_players" placeholder="2–10" min="2" max="10" required>
 
                     <button type="submit">Create</button>
                 </form>
@@ -45,42 +47,58 @@
     <script>
         const socket = io();
 
-        // Debug connection
+        // Debug connection to ensure successful socket connection
         socket.on("connect", () => {
             console.log("✅ Connected:", socket.id);
         });
 
-        // Create Lobby
-        document.getElementById("createLobbyForm").addEventListener("submit", e => {
+        // Create Lobby form submission
+        document.getElementById("createLobbyForm").addEventListener("submit", function (e) {
             e.preventDefault();
             const username = e.target.username.value.trim();
             const maxPlayers = e.target.max_players.value || 2;
+
+            if (!username) {
+                alert("Please enter your name.");
+                return;
+            }
+
+            // Emit event to create the lobby
             socket.emit("create_lobby", { username, maxPlayers });
         });
 
-        // Join Lobby
-        document.getElementById("joinLobbyForm").addEventListener("submit", e => {
+        // Join Lobby form submission
+        document.getElementById("joinLobbyForm").addEventListener("submit", function (e) {
             e.preventDefault();
             const username = e.target.username.value.trim();
             const lobbyCode = e.target.lobby_code.value.trim().toUpperCase();
+
+            if (!username || !lobbyCode) {
+                alert("Please fill in all the fields.");
+                return;
+            }
+
+            // Emit event to join the lobby
             socket.emit("join_lobby", { username, lobbyCode });
         });
 
-        // ✅ Redirects
-        socket.on("lobby_created", data => {
+        // Redirect to the lobby page after creating the lobby
+        socket.on("lobby_created", function (data) {
             console.log("Lobby created:", data);
             window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}`;
         });
 
-        socket.on("lobby_joined", data => {
+        // Redirect to the lobby page after joining a lobby
+        socket.on("lobby_joined", function (data) {
             console.log("Lobby joined:", data);
             window.location.href = `/games/lobby?username=${encodeURIComponent(data.username)}&lobby=${encodeURIComponent(data.lobbyCode)}`;
         });
 
-        // ❌ Error
-        socket.on("error_message", data => {
+        // Handle errors
+        socket.on("error_message", function (data) {
             alert(`❌ ${data.message}`);
         });
     </script>
 </body>
+
 </html>

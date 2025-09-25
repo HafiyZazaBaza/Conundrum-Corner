@@ -279,21 +279,208 @@ def bad_advice_hotline_vote(data):
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
 
-# --- Obviously Lies Handlers ---
+from flask_socketio import emit, join_room, leave_room
+from flask import request
+from . import socketio
+import random
+import string
+from conundrum.games.obviously_lies import ObviouslyLiesGame
+from conundrum.games.reverse_guessing import ReverseGuessingGame
+from conundrum.games.bad_advice_hotline import BadAdviceHotlineGame
+from conundrum.games.emoji_translation import EmojiTranslationGame
+from conundrum.utils.profanity_filter import ProfanityFilter
+from conundrum.utils.round_manager import round_manager
+
+
+# Lobby state: lobby_code -> lobby data
+lobbies = {}
+
+# Game manager instances
+obviously_lies_game_manager = ObviouslyLiesGame()
+reverse_guessing_game_manager = ReverseGuessingGame()
+bad_advice_hotline_game_manager = BadAdviceHotlineGame()
+emoji_translation_game_manager = EmojiTranslationGame()
+
+# Track votes per lobby
+lobby_votes = {}
+
+# Global profanity filter
+pf = ProfanityFilter.from_json("data/profanity.json")
+
+
+def generate_lobby_code():
+    """Generates a random 4-character lobby code."""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+
+
+# --- Lobby Management --- 
+
+@socketio.on("create_lobby")
+def handle_create_lobby(data):
+    username = data.get("username")
+    max_players = data.get("maxPlayers", 8)
+
+    if not username:
+        emit("error_message", {"message": "Username is required."}, room=request.sid)
+        return
+
+    lobby_code = generate_lobby_code()
+    while lobby_code in lobbies:
+        lobby_code = generate_lobby_code()
+
+    lobbies[lobby_code] = {
+        "host": username,
+        "players": [username],
+        "max_players": max_players,
+        "game_mode": None,
+        "current_round": 0,
+        "game_active": False
+    }
+
+    max_rounds = data.get("maxRounds", 3)
+    round_manager.register_lobby(lobby_code, max_rounds)
+
+    join_room(lobby_code)
+
+    emit("lobby_created", {"lobbyCode": lobby_code, "username": username, "maxPlayers": max_players}, room=request.sid)
+    emit("lobby_update", {"host": username, "players": lobbies[lobby_code]["players"]}, room=lobby_code)
+
+
+@socketio.on("join_lobby")
+def handle_join_lobby(data):
+    username = data.get("username")
+    lobby_code = data.get("lobbyCode")
+
+    if not username or not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Invalid join request."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if username in lobby["players"]:
+        emit("error_message", {"message": "You are already in this lobby."}, room=request.sid)
+        return
+    if len(lobby["players"]) >= lobby["max_players"]:
+        emit("error_message", {"message": "Lobby is full."}, room=request.sid)
+        return
+
+    lobby["players"].append(username)
+    join_room(lobby_code)
+
+    emit("lobby_joined", {
+        "lobbyCode": lobby_code,
+        "username": username,
+        "gameMode": lobby["game_mode"],
+        "players": lobby["players"]
+    }, room=request.sid)
+
+    emit("lobby_update", {"host": lobby["host"], "players": lobby["players"]}, room=lobby_code)
+
+
+@socketio.on("send_message")
+def handle_send_message(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+    message = data.get("message")
+
+    if not message or lobby_code not in lobbies:
+        emit("error_message", {"message": "Invalid message or lobby."}, room=request.sid)
+        return
+
+    censored, violations = pf.clean(message)
+
+    emit("receive_message", {"username": username, "message": censored, "violations": violations}, room=lobby_code)
+
+
+@socketio.on("start_game")
+def handle_start_game(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+    mode = data.get("mode")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the game."}, room=request.sid)
+        return
+
+    if not mode:
+        emit("error_message", {"message": "Game mode is required to start."}, room=request.sid)
+        return
+
+    lobby["game_mode"] = mode
+    lobby["game_active"] = True
+    lobby["current_round"] = 1
+
+    round_manager.start_game(lobby_code)
+    round_manager.start_round(lobby_code)
+
+    emit("game_started", {
+        "lobbyCode": lobby_code,
+        "mode": mode,
+        "current_round": lobby["current_round"]
+    }, room=lobby_code)
+
+
+@socketio.on("next_round")
+def handle_next_round(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+
+    if lobby_code not in lobbies or lobbies[lobby_code]["host"] != username:
+        emit("error_message", {"message": "Only the host can advance to the next round."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if not lobby["game_active"]:
+        emit("error_message", {"message": "Game is not active."}, room=request.sid)
+        return
+
+    if lobby["current_round"] >= lobby["max_rounds"]:
+        emit("game_over", {"message": "Game Over. All rounds are complete."}, room=lobby_code)
+        lobby["game_active"] = False
+        return
+
+    lobby["current_round"] += 1
+    emit("round_updated", {"current_round": lobby["current_round"], "max_rounds": lobby["max_rounds"]}, room=lobby_code)
+
+
+# --- Game Mode Handlers --- 
+
+@socketio.on("bad_advice_hotline_start_round")
+def handle_bad_advice_hotline_start_round(data):
+    lobby_code = data.get("lobbyCode")
+    question = data.get("question")
+    username = data.get("username")
+
+    if not lobby_code or lobby_code not in lobbies or not question:
+        emit("error_message", {"message": "Lobby not found or invalid question."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the round."}, room=request.sid)
+        return
+
+    players = set(lobby["players"])
+    host = lobby["host"]
+
+    bad_advice_hotline_game_manager.start_round(lobby_code, question, players, host)
+    emit("bad_advice_hotline_round_started", {"question": question}, room=lobby_code)
+    emit("bad_advice_hotline_all_answers", {"answers": []}, room=lobby_code)
 
 
 @socketio.on("obviously_lies_start_round")
-def obviously_lies_start_round(data):
+def handle_obviously_lies_start_round(data):
     lobby_code = data.get("lobbyCode")
     question = data.get("question")
     correct_answer = data.get("correctAnswer")
     username = data.get("username")
 
-    if not lobby_code or lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
-        return
-    if not question or not correct_answer:
-        emit("error_message", {"message": "Question and answer required."}, room=request.sid)
+    if not lobby_code or lobby_code not in lobbies or not question or not correct_answer:
+        emit("error_message", {"message": "Lobby not found, question or correct answer missing."}, room=request.sid)
         return
 
     lobby = lobbies[lobby_code]
@@ -305,43 +492,37 @@ def obviously_lies_start_round(data):
     host = lobby["host"]
 
     obviously_lies_game_manager.start_round(lobby_code, question, correct_answer, players, host)
-
-    lobby_votes[lobby_code] = {}
-
     emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
     emit("obviously_lies_all_answers", {"answers": [correct_answer]}, room=lobby_code)
 
 
-@socketio.on("obviously_lies_submit_false_answer")
-def obviously_lies_submit_false_answer(data):
+@socketio.on("emoji_translation_start_round")
+def handle_emoji_translation_start_round(data):
     lobby_code = data.get("lobbyCode")
-    player = data.get("player")
-    false_answer = data.get("falseAnswer")
+    emoji_prompt = data.get("emojiPrompt")
+    username = data.get("username")
 
-    if not lobby_code or not obviously_lies_game_manager.games.get(lobby_code):
-        emit("error_message", {"message": "Round not found."}, room=request.sid)
+    if not lobby_code or lobby_code not in lobbies or not emoji_prompt:
+        emit("error_message", {"message": "Lobby not found or emoji prompt missing."}, room=request.sid)
         return
 
-    censored, violations = pf.clean(false_answer)
-
-    success = obviously_lies_game_manager.submit_false_answer(lobby_code, player, censored)
-    if not success:
-        emit("error_message", {"message": "Failed to submit false answer."}, room=request.sid)
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the round."}, room=request.sid)
         return
 
-    emit("obviously_lies_false_answer_submitted", {"falseAnswer": censored, "violations": violations}, room=lobby_code)
+    players = set(lobby["players"])
+    host = lobby["host"]
 
-    player_answers = obviously_lies_game_manager.get_submitted_false_answers(lobby_code)
-    emit("player_own_answers", {"answers": [ans for p, ans in player_answers.items() if p == player]}, room=request.sid)
-
-    if obviously_lies_game_manager.all_false_submitted(lobby_code):
-        all_answers = obviously_lies_game_manager.get_all_answers(lobby_code)
-        random.shuffle(all_answers)
-        emit("obviously_lies_all_answers", {"answers": all_answers}, room=lobby_code)
+    emoji_translation_game_manager.start_round(lobby_code, emoji_prompt, players, host)
+    emit("emoji_translation_round_started", {"emoji_prompt": emoji_prompt}, room=lobby_code)
+    emit("emoji_translation_all_guesses", {"guesses": []}, room=lobby_code)
 
 
-@socketio.on("obviously_lies_vote")
-def obviously_lies_vote(data):
+# --- Helper Method for Voting --- 
+
+@socketio.on("vote")
+def handle_vote(data):
     lobby_code = data.get("lobbyCode")
     player = data.get("player")
     answer = data.get("answer")
@@ -349,44 +530,230 @@ def obviously_lies_vote(data):
     if not lobby_code or lobby_code not in lobbies:
         emit("error_message", {"message": "Lobby not found."}, room=request.sid)
         return
-    if not obviously_lies_game_manager.games.get(lobby_code):
-        emit("error_message", {"message": "Round not started."}, room=request.sid)
+
+    lobby = lobbies[lobby_code]
+    if player == lobby["host"]:
+        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
+        return
+
+    if not answer:
+        emit("error_message", {"message": "Answer required."}, room=request.sid)
         return
 
     current_votes = lobby_votes.setdefault(lobby_code, {})
     if player in current_votes:
-        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
-        return
-    if player == lobbies[lobby_code]["host"]:
-        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
+        emit("error_message", {"message": "You already voted."}, room=request.sid)
         return
 
-    success = obviously_lies_game_manager.cast_vote(lobby_code, player, answer)
+    success = bad_advice_hotline_game_manager.cast_vote(lobby_code, player, answer)
     if success:
         current_votes[player] = answer
-        emit("vote_confirmed", {"answer": answer, "player": player}, room=request.sid)
-        emit("update_votes", {"votes": current_votes}, room=lobby_code)
-        scores = obviously_lies_game_manager.get_scores(lobby_code)
+        emit("vote_confirmed", {"answer": answer, "player": player}, room=lobby_code)
+        scores = bad_advice_hotline_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
     else:
-        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
+        emit("error_message", {"message": "Vote failed."}, room=request.sid)
+
+from flask_socketio import emit, join_room, leave_room
+from flask import request
+from . import socketio
+import random
+import string
+from conundrum.games.obviously_lies import ObviouslyLiesGame
+from conundrum.games.reverse_guessing import ReverseGuessingGame
+from conundrum.games.bad_advice_hotline import BadAdviceHotlineGame
+from conundrum.games.emoji_translation import EmojiTranslationGame
+from conundrum.utils.profanity_filter import ProfanityFilter
+from conundrum.utils.round_manager import round_manager
+
+# Lobby state: lobby_code -> lobby data
+lobbies = {}
+
+# Game manager instances
+obviously_lies_game_manager = ObviouslyLiesGame()
+reverse_guessing_game_manager = ReverseGuessingGame()
+bad_advice_hotline_game_manager = BadAdviceHotlineGame()
+emoji_translation_game_manager = EmojiTranslationGame()
+
+# Track votes per lobby
+lobby_votes = {}
+
+# Global profanity filter
+pf = ProfanityFilter.from_json("data/profanity.json")
+
+def generate_lobby_code():
+    """Generates a random 4-character lobby code."""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+
+# --- Lobby Management --- 
+
+@socketio.on("create_lobby")
+def handle_create_lobby(data):
+    username = data.get("username")
+    max_players = data.get("maxPlayers", 8)
+
+    if not username:
+        emit("error_message", {"message": "Username is required."}, room=request.sid)
+        return
+
+    lobby_code = generate_lobby_code()
+    while lobby_code in lobbies:
+        lobby_code = generate_lobby_code()
+
+    lobbies[lobby_code] = {
+        "host": username,
+        "players": [username],
+        "max_players": max_players,
+        "game_mode": None,
+        "current_round": 0,
+        "game_active": False
+    }
+
+    max_rounds = data.get("maxRounds", 3)
+    round_manager.register_lobby(lobby_code, max_rounds)
+
+    join_room(lobby_code)
+
+    emit("lobby_created", {"lobbyCode": lobby_code, "username": username, "maxPlayers": max_players}, room=request.sid)
+    emit("lobby_update", {"host": username, "players": lobbies[lobby_code]["players"]}, room=lobby_code)
 
 
-# --- Reverse Guessing Handlers ---
+@socketio.on("join_lobby")
+def handle_join_lobby(data):
+    username = data.get("username")
+    lobby_code = data.get("lobbyCode")
+
+    if not username or not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Invalid join request."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if username in lobby["players"]:
+        emit("error_message", {"message": "You are already in this lobby."}, room=request.sid)
+        return
+    if len(lobby["players"]) >= lobby["max_players"]:
+        emit("error_message", {"message": "Lobby is full."}, room=request.sid)
+        return
+
+    lobby["players"].append(username)
+    join_room(lobby_code)
+
+    emit("lobby_joined", {
+        "lobbyCode": lobby_code,
+        "username": username,
+        "gameMode": lobby["game_mode"],
+        "players": lobby["players"]
+    }, room=request.sid)
+
+    emit("lobby_update", {"host": lobby["host"], "players": lobby["players"]}, room=lobby_code)
+
+
+@socketio.on("send_message")
+def handle_send_message(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+    message = data.get("message")
+
+    if not message or lobby_code not in lobbies:
+        emit("error_message", {"message": "Invalid message or lobby."}, room=request.sid)
+        return
+
+    censored, violations = pf.clean(message)
+
+    emit("receive_message", {"username": username, "message": censored, "violations": violations}, room=lobby_code)
+
+
+@socketio.on("start_game")
+def handle_start_game(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+    mode = data.get("mode")
+
+    if not lobby_code or lobby_code not in lobbies:
+        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the game."}, room=request.sid)
+        return
+
+    if not mode:
+        emit("error_message", {"message": "Game mode is required to start."}, room=request.sid)
+        return
+
+    lobby["game_mode"] = mode
+    lobby["game_active"] = True
+    lobby["current_round"] = 1
+
+    round_manager.start_game(lobby_code)
+    round_manager.start_round(lobby_code)
+
+    emit("game_started", {
+        "lobbyCode": lobby_code,
+        "mode": mode,
+        "current_round": lobby["current_round"]
+    }, room=lobby_code)
+
+
+@socketio.on("next_round")
+def handle_next_round(data):
+    lobby_code = data.get("lobbyCode")
+    username = data.get("username")
+
+    if lobby_code not in lobbies or lobbies[lobby_code]["host"] != username:
+        emit("error_message", {"message": "Only the host can advance to the next round."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if not lobby["game_active"]:
+        emit("error_message", {"message": "Game is not active."}, room=request.sid)
+        return
+
+    if lobby["current_round"] >= lobby["max_rounds"]:
+        emit("game_over", {"message": "Game Over. All rounds are complete."}, room=lobby_code)
+        lobby["game_active"] = False
+        return
+
+    lobby["current_round"] += 1
+    emit("round_updated", {"current_round": lobby["current_round"], "max_rounds": lobby["max_rounds"]}, room=lobby_code)
+
+
+# --- Game Mode Handlers --- 
+
+@socketio.on("obviously_lies_start_round")
+def handle_obviously_lies_start_round(data):
+    lobby_code = data.get("lobbyCode")
+    question = data.get("question")
+    correct_answer = data.get("correctAnswer")
+    username = data.get("username")
+
+    if not lobby_code or lobby_code not in lobbies or not question or not correct_answer:
+        emit("error_message", {"message": "Lobby not found, question or correct answer missing."}, room=request.sid)
+        return
+
+    lobby = lobbies[lobby_code]
+    if lobby["host"] != username:
+        emit("error_message", {"message": "Only the host can start the round."}, room=request.sid)
+        return
+
+    players = set(lobby["players"])
+    host = lobby["host"]
+
+    obviously_lies_game_manager.start_round(lobby_code, question, correct_answer, players, host)
+    emit("obviously_lies_round_started", {"question": question}, room=lobby_code)
+    emit("obviously_lies_all_answers", {"answers": [correct_answer]}, room=lobby_code)
 
 
 @socketio.on("reverse_guessing_start_round")
-def reverse_guessing_start_round(data):
+def handle_reverse_guessing_start_round(data):
     lobby_code = data.get("lobbyCode")
     answer = data.get("answer")
     correct_question = data.get("correctQuestion")
     username = data.get("username")
 
-    if not lobby_code or lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
-        return
-    if not answer or not correct_question:
-        emit("error_message", {"message": "Answer and correct question required."}, room=request.sid)
+    if not lobby_code or lobby_code not in lobbies or not answer or not correct_question:
+        emit("error_message", {"message": "Answer or correct question missing."}, room=request.sid)
         return
 
     lobby = lobbies[lobby_code]
@@ -398,86 +765,17 @@ def reverse_guessing_start_round(data):
     host = lobby["host"]
 
     reverse_guessing_game_manager.start_round(lobby_code, answer, correct_question, players, host)
-
-    lobby_votes[lobby_code] = {}
-
     emit("reverse_guessing_round_started", {"answer": answer}, room=lobby_code)
     emit("reverse_guessing_all_questions", {"questions": [correct_question]}, room=lobby_code)
 
 
-@socketio.on("reverse_guessing_submit_question")
-def reverse_guessing_submit_question(data):
-    lobby_code = data.get("lobbyCode")
-    player = data.get("player")
-    guessed_question = data.get("guessedQuestion")
-
-    if not lobby_code or not reverse_guessing_game_manager.games.get(lobby_code):
-        emit("error_message", {"message": "Round not found."}, room=request.sid)
-        return
-
-    censored, violations = pf.clean(guessed_question)
-
-    success = reverse_guessing_game_manager.submit_question(lobby_code, player, censored)
-    if not success:
-        emit("error_message", {"message": "Failed to submit question."}, room=request.sid)
-        return
-
-    emit("reverse_guessing_question_submitted", {"guessedQuestion": censored, "violations": violations}, room=lobby_code)
-
-    player_questions = reverse_guessing_game_manager.get_submitted_questions(lobby_code)
-    emit("player_own_questions", {"questions": [q for p, q in player_questions.items() if p == player]}, room=request.sid)
-
-    if reverse_guessing_game_manager.all_questions_submitted(lobby_code):
-        all_questions = reverse_guessing_game_manager.get_all_questions(lobby_code)
-        random.shuffle(all_questions)
-        emit("reverse_guessing_all_questions", {"questions": all_questions}, room=lobby_code)
-
-
-@socketio.on("reverse_guessing_vote")
-def reverse_guessing_vote(data):
-    lobby_code = data.get("lobbyCode")
-    player = data.get("player")
-    question = data.get("question")
-
-    if not lobby_code or lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
-        return
-    if not reverse_guessing_game_manager.games.get(lobby_code):
-        emit("error_message", {"message": "Round not started."}, room=request.sid)
-        return
-
-    current_votes = lobby_votes.setdefault(lobby_code, {})
-    if player in current_votes:
-        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
-        return
-    if player == lobbies[lobby_code]["host"]:
-        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
-        return
-
-    success = reverse_guessing_game_manager.cast_vote(lobby_code, player, question)
-    if success:
-        current_votes[player] = question
-        emit("vote_confirmed", {"question": question, "player": player}, room=request.sid)
-        emit("update_votes", {"votes": current_votes}, room=lobby_code)
-        scores = reverse_guessing_game_manager.get_scores(lobby_code)
-        emit("update_scores", {"scores": scores}, room=lobby_code)
-    else:
-        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
-
-
-# --- Emoji Translation Handlers ---
-
-
 @socketio.on("emoji_translation_start_round")
-def emoji_translation_start_round(data):
+def handle_emoji_translation_start_round(data):
     lobby_code = data.get("lobbyCode")
     emoji_prompt = data.get("emojiPrompt")
     username = data.get("username")
 
-    if not lobby_code or lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
-        return
-    if not emoji_prompt:
+    if not lobby_code or lobby_code not in lobbies or not emoji_prompt:
         emit("error_message", {"message": "Emoji prompt is required."}, room=request.sid)
         return
 
@@ -490,137 +788,5 @@ def emoji_translation_start_round(data):
     host = lobby["host"]
 
     emoji_translation_game_manager.start_round(lobby_code, emoji_prompt, players, host)
-
-    lobby_votes[lobby_code] = {}
-
     emit("emoji_translation_round_started", {"emoji_prompt": emoji_prompt}, room=lobby_code)
     emit("emoji_translation_all_guesses", {"guesses": []}, room=lobby_code)
-
-
-@socketio.on("emoji_translation_submit_guess")
-def emoji_translation_submit_guess(data):
-    lobby_code = data.get("lobbyCode")
-    player = data.get("player")
-    guess = data.get("guess")
-
-    if not lobby_code or not emoji_translation_game_manager.games.get(lobby_code):
-        emit("error_message", {"message": "Round not found."}, room=request.sid)
-        return
-
-    censored, violations = pf.clean(guess)
-
-    success = emoji_translation_game_manager.submit_guess(lobby_code, player, censored)
-    if not success:
-        emit("error_message", {"message": "Failed to submit guess."}, room=request.sid)
-        return
-
-    emit("emoji_translation_guess_submitted", {"guess": censored, "violations": violations}, room=lobby_code)
-
-    player_guesses = emoji_translation_game_manager.get_submitted_guesses(lobby_code)
-    emit("player_own_guesses", {"guesses": [g for p, g in player_guesses.items() if p == player]}, room=request.sid)
-
-    if emoji_translation_game_manager.all_guesses_submitted(lobby_code):
-        all_guesses = emoji_translation_game_manager.get_all_guesses(lobby_code)
-        random.shuffle(all_guesses)
-        emit("emoji_translation_all_guesses", {"guesses": all_guesses}, room=lobby_code)
-
-
-@socketio.on("emoji_translation_vote")
-def emoji_translation_vote(data):
-    lobby_code = data.get("lobbyCode")
-    player = data.get("player")
-    guess = data.get("guess")
-
-    if not lobby_code or lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
-        return
-    if not emoji_translation_game_manager.games.get(lobby_code):
-        emit("error_message", {"message": "Round not started."}, room=request.sid)
-        return
-
-    current_votes = lobby_votes.setdefault(lobby_code, {})
-    if player in current_votes:
-        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
-        return
-    if player == lobbies[lobby_code]["host"]:
-        emit("error_message", {"message": "Host cannot vote."}, room=request.sid)
-        return
-
-    success = emoji_translation_game_manager.cast_vote(lobby_code, player, guess)
-    if success:
-        current_votes[player] = guess
-        emit("vote_confirmed", {"guess": guess, "player": player}, room=request.sid)
-        emit("update_votes", {"votes": current_votes}, room=lobby_code)
-        scores = emoji_translation_game_manager.get_scores(lobby_code)
-        emit("update_scores", {"scores": scores}, room=lobby_code)
-    else:
-        emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
-
-
-# --- End Round Handler ---
-
-
-@socketio.on("end_round")
-def handle_end_round(data):
-    lobby_code = data.get("lobbyCode")
-
-    if not lobby_code or lobby_code not in lobbies:
-        emit("error_message", {"message": "Lobby not found."}, room=request.sid)
-        return
-
-    mode = lobbies[lobby_code].get("game_mode")
-    if mode == "obviously_lies":
-        res = round_manager.end_round(lobby_code)
-
-        if res.get("game_over"):
-            scores = obviously_lies_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            obviously_lies_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
-
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
-
-    elif mode == "reverse_guessing":
-        res = round_manager.end_round(lobby_code)
-
-        if res.get("game_over"):
-            scores = reverse_guessing_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            reverse_guessing_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
-
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
-
-    elif mode == "bad_advice_hotline":
-        res = round_manager.end_round(lobby_code)
-
-        if res.get("game_over"):
-            scores = bad_advice_hotline_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            bad_advice_hotline_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
-
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
-
-    elif mode == "emoji_translation":
-        res = round_manager.end_round(lobby_code)
-
-        if res.get("game_over"):
-            scores = emoji_translation_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            emoji_translation_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
-
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
