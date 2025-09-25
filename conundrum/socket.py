@@ -1,3 +1,4 @@
+# conundrum/socket.py
 from flask_socketio import emit, join_room
 from flask import request
 from . import socketio
@@ -32,6 +33,72 @@ pf = ProfanityFilter.from_json("data/profanity.json")
 
 def generate_lobby_code():
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+
+
+def _get_expected_voter_count(lobby_code):
+    """
+    Compute number of expected voters for a lobby.
+    Current logic: host cannot vote, so expected = number of players - 1.
+    If you later allow host to vote, adjust this function.
+    """
+    players = lobbies.get(lobby_code, {}).get("players", [])
+    return max(0, len(players) - 1)
+
+
+def _process_end_round_for_manager(lobby_code, manager):
+    """
+    Centralized end-of-round flow:
+      - calls round_manager.end_round (which will invoke handler.on_round_end and handler.reset_round)
+      - emits game_over or round_ended and cleans up lobby_votes
+      - unregisters the lobby from round_manager when game finishes
+      - resets per-round state in the game manager
+    """
+    try:
+        res = round_manager.end_round(lobby_code)
+    except KeyError:
+        # not registered — report and stop
+        emit("error_message", {"message": "Round manager not registered for lobby."}, room=lobby_code)
+        return
+
+    if res.get("game_over"):
+        # final scores and cleanup
+        try:
+            scores = manager.get_scores(lobby_code)
+        except Exception:
+            scores = {}
+
+        emit("game_over", {"scores": scores}, room=lobby_code)
+
+        # cleanup: remove votes and unregister from round manager
+        lobby_votes.pop(lobby_code, None)
+        try:
+            round_manager.unregister_lobby(lobby_code)
+        except Exception:
+            pass
+
+        # make sure per-round state is cleared in the game manager
+        try:
+            manager.reset_round_state(lobby_code)
+        except Exception:
+            pass
+    else:
+        # not game over: reset per-round state and start next round
+        # note: handler.reset_round is normally called inside round_manager.end_round;
+        # calling again is harmless and defensive
+        try:
+            manager.reset_round_state(lobby_code)
+        except Exception:
+            pass
+
+        lobby_votes[lobby_code] = {}
+        next_round = res.get("next_round")
+        emit("round_ended", {"next_round": next_round}, room=lobby_code)
+
+        # start next round (caller may rely on client to call start_round, but your current flow calls it)
+        try:
+            round_manager.start_round(lobby_code)
+        except Exception:
+            pass
 
 
 # --- Lobby management ---
@@ -138,14 +205,34 @@ def handle_start_game(data):
 
     lobby["game_mode"] = mode
 
-    round_manager.start_game(lobby_code)
-    round_manager.start_round(lobby_code)
+    # Start whole game in round_manager (initialises current_round and marks active)
+    # We keep this as your canonical entry point for the rounds system
+    try:
+        round_manager.start_game(lobby_code)
+    except Exception:
+        # If lobby wasn't registered earlier, try register with defaults
+        try:
+            round_manager.register_lobby(lobby_code, max_rounds=int(data.get("maxRounds", 3)))
+            round_manager.start_game(lobby_code)
+        except Exception:
+            emit("error_message", {"message": "Failed to start round manager for lobby."}, room=request.sid)
+            return
+
+    # Start the first round (or set round_active)
+    try:
+        round_manager.start_round(lobby_code)
+    except Exception:
+        pass
 
     lobby_votes[lobby_code] = {}
 
     # Setup round handler callbacks based on mode
     if mode == "obviously_lies":
-        obviously_lies_game_manager.end_round(lobby_code)
+        # clear any lingering per-round state (do not call end_round here)
+        try:
+            obviously_lies_game_manager.reset_round_state(lobby_code)
+        except Exception:
+            pass
         round_manager.set_handler(
             lobby_code,
             {
@@ -155,7 +242,11 @@ def handle_start_game(data):
         )
 
     elif mode == "reverse_guessing":
-        reverse_guessing_game_manager.end_round(lobby_code)
+        # clear lingering per-round state instead of calling end_round
+        try:
+            reverse_guessing_game_manager.reset_round_state(lobby_code)
+        except Exception:
+            pass
         round_manager.set_handler(
             lobby_code,
             {
@@ -165,7 +256,10 @@ def handle_start_game(data):
         )
 
     elif mode == "bad_advice_hotline":
-        bad_advice_hotline_game_manager.end_round(lobby_code)
+        try:
+            bad_advice_hotline_game_manager.reset_round_state(lobby_code)
+        except Exception:
+            pass
         round_manager.set_handler(
             lobby_code,
             {
@@ -175,7 +269,10 @@ def handle_start_game(data):
         )
 
     elif mode == "emoji_translation":
-        emoji_translation_game_manager.end_round(lobby_code)
+        try:
+            emoji_translation_game_manager.reset_round_state(lobby_code)
+        except Exception:
+            pass
         round_manager.set_handler(
             lobby_code,
             {
@@ -275,6 +372,11 @@ def bad_advice_hotline_vote(data):
         emit("update_votes", {"votes": current_votes}, room=lobby_code)
         scores = bad_advice_hotline_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
+
+        # --- NEW: auto-end round when all non-host players have voted ---
+        expected = _get_expected_voter_count(lobby_code)
+        if expected > 0 and len(current_votes) >= expected:
+            _process_end_round_for_manager(lobby_code, bad_advice_hotline_game_manager)
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
@@ -368,6 +470,11 @@ def obviously_lies_vote(data):
         emit("update_votes", {"votes": current_votes}, room=lobby_code)
         scores = obviously_lies_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
+
+        # --- NEW: auto-end round when all non-host players have voted ---
+        expected = _get_expected_voter_count(lobby_code)
+        if expected > 0 and len(current_votes) >= expected:
+            _process_end_round_for_manager(lobby_code, obviously_lies_game_manager)
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
@@ -461,6 +568,11 @@ def reverse_guessing_vote(data):
         emit("update_votes", {"votes": current_votes}, room=lobby_code)
         scores = reverse_guessing_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
+
+        # --- NEW: auto-end round when all non-host players have voted ---
+        expected = _get_expected_voter_count(lobby_code)
+        if expected > 0 and len(current_votes) >= expected:
+            _process_end_round_for_manager(lobby_code, reverse_guessing_game_manager)
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
@@ -553,6 +665,11 @@ def emoji_translation_vote(data):
         emit("update_votes", {"votes": current_votes}, room=lobby_code)
         scores = emoji_translation_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
+
+        # --- NEW: auto-end round when all non-host players have voted ---
+        expected = _get_expected_voter_count(lobby_code)
+        if expected > 0 and len(current_votes) >= expected:
+            _process_end_round_for_manager(lobby_code, emoji_translation_game_manager)
     else:
         emit("error_message", {"message": "Vote failed or already voted."}, room=request.sid)
 
@@ -569,58 +686,39 @@ def handle_end_round(data):
         return
 
     mode = lobbies[lobby_code].get("game_mode")
-    if mode == "obviously_lies":
-        res = round_manager.end_round(lobby_code)
+    res = round_manager.end_round(lobby_code)
 
-        if res.get("game_over"):
-            scores = obviously_lies_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            obviously_lies_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
+    if not res:
+        emit("error_message", {"message": "Round could not be ended."}, room=request.sid)
+        return
 
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
+    # Pick correct game manager
+    managers = {
+        "obviously_lies": obviously_lies_game_manager,
+        "reverse_guessing": reverse_guessing_game_manager,
+        "bad_advice_hotline": bad_advice_hotline_game_manager,
+        "emoji_translation": emoji_translation_game_manager,
+    }
+    manager = managers.get(mode)
 
-    elif mode == "reverse_guessing":
-        res = round_manager.end_round(lobby_code)
+    if not manager:
+        emit("error_message", {"message": f"Unknown game mode {mode}."}, room=request.sid)
+        return
 
-        if res.get("game_over"):
-            scores = reverse_guessing_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            reverse_guessing_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
+    if res.get("game_over"):
+        scores = manager.get_scores(lobby_code)
+        emit("game_over", {"scores": scores}, room=lobby_code)
+        # Clean up after game ends
+        # round_manager.end_game(lobby_code)  # replaced with unregister for safety
+        try:
+            round_manager.unregister_lobby(lobby_code)
+        except Exception:
+            pass
+        lobby_votes.pop(lobby_code, None)
+    else:
+        manager.reset_round_state(lobby_code)
+        lobby_votes[lobby_code] = {}
 
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
-
-    elif mode == "bad_advice_hotline":
-        res = round_manager.end_round(lobby_code)
-
-        if res.get("game_over"):
-            scores = bad_advice_hotline_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            bad_advice_hotline_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
-
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
-
-    elif mode == "emoji_translation":
-        res = round_manager.end_round(lobby_code)
-
-        if res.get("game_over"):
-            scores = emoji_translation_game_manager.get_scores(lobby_code)
-            emit("game_over", {"scores": scores}, room=lobby_code)
-        else:
-            emoji_translation_game_manager.reset_round_state(lobby_code)
-            lobby_votes[lobby_code] = {}
-
-            next_round = res["next_round"]
-            emit("round_ended", {"next_round": next_round}, room=lobby_code)
-            round_manager.start_round(lobby_code)
+        next_round = res["next_round"]
+        emit("round_ended", {"next_round": next_round}, room=lobby_code)
+        round_manager.start_round(lobby_code)
