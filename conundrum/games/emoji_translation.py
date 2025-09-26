@@ -1,20 +1,18 @@
-# conundrum/games/emoji_translation.py
-
 class EmojiTranslationGame:
     def __init__(self):
         # Stores game state keyed by lobby_code
         self.games = {}
 
-    def start_round(self, lobby_code, emoji_prompt, players, host=None):
+    def start_game(self, lobby_code, emoji_prompt, players, host=None):
         # Exclude host from players eligible for scoring
         eligible_players = set(players) - {host} if host else set(players)
         self.games[lobby_code] = {
-            "emoji_prompt": emoji_prompt,          # The emoji string input by host
+            "emoji_prompt": emoji_prompt,           # The emoji string input by host
             "players": set(players),
-            "guesses": {},                         # player -> guessed sentence
+            "guesses": {},                          # player -> guessed sentence
             "finished_submitting": set(),
-            "votes": {},                          # guess -> set of players who voted for it
-            "guess_to_player": {},                 # guess -> player who submitted it
+            "votes": {},                           # guess -> set of players who voted for it
+            "guess_to_player": {},                  # guess -> player who submitted it
             "scores": {player: 0 for player in eligible_players},  # only non-host players score
             "host": host,
         }
@@ -62,7 +60,7 @@ class EmojiTranslationGame:
         # Host cannot vote
         if player == game.get("host"):
             return False
-        # Player can vote only once per round
+        # Player can vote only once
         for voters in game["votes"].values():
             if player in voters:
                 return False
@@ -102,19 +100,8 @@ class EmojiTranslationGame:
             return {}
         return game.get("scores", {})
 
-    def end_round(self, lobby_code):
-        """Finalize round but do not delete scores."""
-        game = self.games.get(lobby_code)
-        if not game:
-            return {}
-        summary = {
-            "scores": game["scores"].copy(),
-            "votes": {guess: list(voters) for guess, voters in game["votes"].items()},
-        }
-        return summary
-
-    def reset_round_state(self, lobby_code):
-        """Reset per-round state but keep scores intact."""
+    def reset_game_state(self, lobby_code):
+        # Reset guesses, votes and submissions but keep scores intact
         game = self.games.get(lobby_code)
         if not game:
             return
@@ -123,4 +110,5 @@ class EmojiTranslationGame:
             "finished_submitting": set(),
             "votes": {},
             "guess_to_player": {},
+            "emoji_prompt": None,
         })

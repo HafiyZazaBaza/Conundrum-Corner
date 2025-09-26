@@ -137,8 +137,3 @@ def create_lobby():
         "total_rounds": total_rounds,
         "game_active": False,
     }
-
-    # Setup round manager 👇
-    round_manager.setup_lobby(lobby_id, total_rounds=total_rounds)
-
-    return jsonify({"success": True, "lobby_id": lobby_id})

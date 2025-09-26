@@ -124,7 +124,7 @@
       <form id="host-form">
         <label for="question-input">Question:</label>
         <input id="question-input" type="text" required />
-        <button type="submit">Start Round</button>
+        <button type="submit">Submit Question</button>
       </form>
     </div>
 
@@ -190,10 +190,10 @@
         alert("Please enter a question.");
         return;
       }
-      socket.emit("bad_advice_hotline_start_round", { lobbyCode, question, username });
+      socket.emit("bad_advice_hotline_start_game", { lobbyCode, question, username });
     });
 
-    socket.on("bad_advice_hotline_round_started", data => {
+    socket.on("bad_advice_hotline_game_started", data => {
       question = data.question || "";
       document.getElementById("question-section").classList.remove("hidden");
       document.getElementById("display-question").textContent = question;

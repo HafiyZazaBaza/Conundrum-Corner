@@ -1,12 +1,9 @@
-# conundrum/games/obviously_lies.py
-
-
 class ObviouslyLiesGame:
     def __init__(self):
         # Stores game state keyed by lobby_code
         self.games = {}
 
-    def start_round(self, lobby_code, question, correct_answer, players, host=None):
+    def start_game(self, lobby_code, question, correct_answer, players, host=None):
         # Exclude host from players eligible for scoring
         eligible_players = set(players) - {host} if host else set(players)
         self.games[lobby_code] = {
@@ -18,7 +15,7 @@ class ObviouslyLiesGame:
             "votes": {correct_answer: set()},  # answer -> set of players who voted for it
             "answer_to_player": {correct_answer: None},  # answer -> player who submitted (None for correct answer)
             "scores": {player: 0 for player in eligible_players},  # only non-host players score
-            "host": host,  # remember the host
+            "host": host,
         }
 
     def submit_false_answer(self, lobby_code, player, false_answer):
@@ -30,7 +27,6 @@ class ObviouslyLiesGame:
             game["finished_submitting"].add(player)
             if false_answer not in game["votes"]:
                 game["votes"][false_answer] = set()
-            # Track which player submitted which answer
             game["answer_to_player"][false_answer] = player
             return True
         return False
@@ -64,29 +60,24 @@ class ObviouslyLiesGame:
             return False
         if player not in game["players"]:
             return False
-        # Host cannot vote
         if player == game.get("host"):
             return False
-        # Player can only vote once per round
         for voters in game["votes"].values():
             if player in voters:
                 return False
-        # Check if answer is valid in this round
         if answer not in game["votes"]:
             return False
-        # Prevent voting on one's own false answer
         answer_owner = game["answer_to_player"].get(answer)
         if answer_owner == player:
             return False
-        # Cast the vote
         game["votes"][answer].add(player)
 
-        # Update scores:
-        # If voted a false answer, owner of false answer gets a point (if not host)
+        # Update scores
         if answer_owner is not None and answer_owner != game.get("host"):
+            # If voted a false answer, owner gets a point
             game["scores"][answer_owner] += 1
-        # If voted the correct answer, voter gets a point (if not host)
         if answer == game["correct_answer"] and player != game.get("host"):
+            # If voted correct answer, voter gets a point
             game["scores"][player] += 1
 
         return True
@@ -112,20 +103,8 @@ class ObviouslyLiesGame:
             return {}
         return game.get("scores", {})
 
-    def end_round(self, lobby_code):
-        """Finalize round but do not delete scores (RoundManager decides if game ends)."""
-        game = self.games.get(lobby_code)
-        if not game:
-            return {}
-        # could compute summary stats here if you want
-        summary = {
-            "scores": game["scores"].copy(),
-            "votes": {ans: list(voters) for ans, voters in game["votes"].items()},
-        }
-        return summary
-   
-    def reset_round_state(self, lobby_code):
-        """Reset per-round state but keep scores intact."""
+    def reset_game_state(self, lobby_code):
+        # Reset per-game state but keep scores intact
         game = self.games.get(lobby_code)
         if not game:
             return
