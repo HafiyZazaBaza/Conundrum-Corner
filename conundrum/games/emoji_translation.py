@@ -11,11 +11,11 @@ class EmojiTranslationGame:
         self.games[lobby_code] = {
             "emoji_prompt": emoji_prompt,          # The emoji string input by host
             "players": set(players),
-            "guesses": {},                         # player -> guessed sentence
+            "guesses": {},                         
             "finished_submitting": set(),
-            "votes": {},                          # guess -> set of players who voted for it
-            "guess_to_player": {},                 # guess -> player who submitted it
-            "scores": {player: 0 for player in eligible_players},  # only non-host players score
+            "votes": {},                          
+            "guess_to_player": {},                 
+            "scores": {player: 0 for player in eligible_players},  
             "host": host,
         }
 
@@ -77,7 +77,7 @@ class EmojiTranslationGame:
 
         # Owner of the guess gets a point when their guess is voted
         if guess_owner and guess_owner != game.get("host"):
-            game["scores"][guess_owner] += 1
+            game["scores"][guess_owner] += 5
 
         return True
 

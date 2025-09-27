@@ -1,38 +1,26 @@
 # conundrum/games/routes.py
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify
-
 from conundrum import socket as socket_module  
 
 # Import game classes
 from conundrum.games.obviously_lies import ObviouslyLiesGame
-
 from conundrum.utils.profanity_filter import ProfanityFilter
 
 # Import main routes blueprint for redirects
 from conundrum.routes import routes  
-
 from conundrum.utils.rounds import round_manager
-
 from engine import lobbies
 
-# --------------------------
 # Blueprint
-# --------------------------
 games_bp = Blueprint("games", __name__, url_prefix="/games")
 
-# --------------------------
 # Game Instances
-# --------------------------
 lies_game = ObviouslyLiesGame()
 
-# --------------------------
 # Profanity Filter Instance
-# --------------------------
 pf = ProfanityFilter()
 
-# --------------------------
 # Lobby Route
-# --------------------------
 @games_bp.route("/lobby")
 def lobby():
     """Render the lobby page with user + lobby info."""

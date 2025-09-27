@@ -9,10 +9,10 @@ class BadAdviceHotlineGame:
         self.games[lobby_code] = {
             "question": question,
             "players": set(players),
-            "bad_advice_answers": {},  # player -> bad advice answer
+            "bad_advice_answers": {},  
             "finished_submitting": set(),
-            "votes": {},  # answer -> set of players who voted for it
-            "answer_to_player": {},  # answer -> player who submitted it
+            "votes": {},  
+            "answer_to_player": {},  
             "scores": {player: 0 for player in eligible_players},  # only non-host players score
             "host": host,
         }
@@ -79,7 +79,7 @@ class BadAdviceHotlineGame:
         # Update scores:
         # If voted for a bad advice answer, owner of that answer gets a point (excluding host)
         if answer_owner is not None and answer_owner != game.get("host"):
-            game["scores"][answer_owner] += 1
+            game["scores"][answer_owner] += 5
 
         return True
 

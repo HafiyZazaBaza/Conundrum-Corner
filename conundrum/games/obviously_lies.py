@@ -84,10 +84,10 @@ class ObviouslyLiesGame:
         # Update scores:
         # If voted a false answer, owner of false answer gets a point (if not host)
         if answer_owner is not None and answer_owner != game.get("host"):
-            game["scores"][answer_owner] += 1
+            game["scores"][answer_owner] += 4
         # If voted the correct answer, voter gets a point (if not host)
         if answer == game["correct_answer"] and player != game.get("host"):
-            game["scores"][player] += 1
+            game["scores"][player] += 5
 
         return True
 
@@ -117,7 +117,7 @@ class ObviouslyLiesGame:
         game = self.games.get(lobby_code)
         if not game:
             return {}
-        # could compute summary stats here if you want
+        # compute summary stats 
         summary = {
             "scores": game["scores"].copy(),
             "votes": {ans: list(voters) for ans, voters in game["votes"].items()},

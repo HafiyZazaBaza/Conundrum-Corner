@@ -84,7 +84,6 @@ def _process_end_round_for_manager(lobby_code, manager):
     else:
         # not game over: reset per-round state and start next round
         # note: handler.reset_round is normally called inside round_manager.end_round;
-        # calling again is harmless and defensive
         try:
             manager.reset_round_state(lobby_code)
         except Exception:
@@ -373,7 +372,7 @@ def bad_advice_hotline_vote(data):
         scores = bad_advice_hotline_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
 
-        # --- NEW: auto-end round when all non-host players have voted ---
+        # auto-end round when all non-host players have voted
         expected = _get_expected_voter_count(lobby_code)
         if expected > 0 and len(current_votes) >= expected:
             _process_end_round_for_manager(lobby_code, bad_advice_hotline_game_manager)
@@ -569,7 +568,7 @@ def reverse_guessing_vote(data):
         scores = reverse_guessing_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
 
-        # --- NEW: auto-end round when all non-host players have voted ---
+        # auto-end round when all non-host players have voted 
         expected = _get_expected_voter_count(lobby_code)
         if expected > 0 and len(current_votes) >= expected:
             _process_end_round_for_manager(lobby_code, reverse_guessing_game_manager)
@@ -666,7 +665,7 @@ def emoji_translation_vote(data):
         scores = emoji_translation_game_manager.get_scores(lobby_code)
         emit("update_scores", {"scores": scores}, room=lobby_code)
 
-        # --- NEW: auto-end round when all non-host players have voted ---
+        # auto-end round when all non-host players have voted
         expected = _get_expected_voter_count(lobby_code)
         if expected > 0 and len(current_votes) >= expected:
             _process_end_round_for_manager(lobby_code, emoji_translation_game_manager)
@@ -692,7 +691,7 @@ def handle_end_round(data):
         emit("error_message", {"message": "Round could not be ended."}, room=request.sid)
         return
 
-    # Pick correct game manager
+    # pick correct game manager
     managers = {
         "obviously_lies": obviously_lies_game_manager,
         "reverse_guessing": reverse_guessing_game_manager,

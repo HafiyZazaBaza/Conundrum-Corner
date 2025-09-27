@@ -12,10 +12,10 @@ class ReverseGuessingGame:
             "answer": answer,  # host-provided answer
             "correct_question": correct_question,  # host-provided correct question
             "players": set(players),
-            "submitted_questions": {},  # player -> guessed question
+            "submitted_questions": {},  
             "finished_submitting": set(),
-            "votes": {correct_question: set()},  # question -> set of players who voted for it
-            "question_to_player": {correct_question: None},  # question -> player who submitted it (None for correct)
+            "votes": {correct_question: set()},  
+            "question_to_player": {correct_question: None},  
             "scores": {player: 0 for player in eligible_players},
             "host": host,
         }
@@ -78,10 +78,10 @@ class ReverseGuessingGame:
         # Score updates:
         # If voted on a submitted question, the submitter gains a point (if not host)
         if question_owner is not None and question_owner != game.get("host"):
-            game["scores"][question_owner] += 1
+            game["scores"][question_owner] += 4
         # If voted on the correct question, the voter gains a point (if not host)
         if question == game["correct_question"] and player != game.get("host"):
-            game["scores"][player] += 1
+            game["scores"][player] += 5
 
         return True
 
