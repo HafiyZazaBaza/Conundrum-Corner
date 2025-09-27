@@ -191,6 +191,11 @@
       <h3>Scores</h3>
       <ul id="scores-list"></ul>
     </div>
+
+    <!-- ✅ Recap Button -->
+    <div id="recap-section" class="hidden">
+      <button onclick="goToRecap()">Go to Recap</button>
+    </div>
   </div>
 
   <script>
@@ -547,6 +552,21 @@
         scoresList.appendChild(li);
       });
     });
+
+    function goToRecap() {
+      window.location.href = "/games/recap";
+    }
+
+    socket.on("round_end", data => {
+      console.log("Round ended:", data);
+
+      // Save summary in localStorage for recap.html
+      localStorage.setItem("recapSummary", JSON.stringify(data));
+
+      // Show recap button
+      document.getElementById("recap-section").classList.remove("hidden");
+    });
   </script>
 </body>
+
 </html>

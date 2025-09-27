@@ -108,8 +108,13 @@ class EmojiTranslationGame:
         if not game:
             return {}
         summary = {
+            "game": "emoji_translation",
             "scores": game["scores"].copy(),
-            "votes": {guess: list(voters) for guess, voters in game["votes"].items()},
+            "details": {
+                "emoji_prompt": game["emoji_prompt"],
+                "guesses": game["guesses"].copy(),
+                "votes": {guess: list(voters) for guess, voters in game["votes"].items()},
+            },
         }
         return summary
 

@@ -111,9 +111,11 @@ class ReverseGuessingGame:
         if not game:
             return {}
         summary = {
-            "scores": game["scores"].copy(),
-            "votes": {ques: list(voters) for ques, voters in game["votes"].items()},
-        }
+         "scores": game["scores"].copy(),
+         "votes": {ans: list(voters) for ans, voters in game["votes"].items()},
+         "question": game.get("question") if hasattr(game, "question") else None,
+         "answer": game.get("answer") if hasattr(game, "answer") else None
+        }   
         return summary
 
     def reset_round_state(self, lobby_code):
