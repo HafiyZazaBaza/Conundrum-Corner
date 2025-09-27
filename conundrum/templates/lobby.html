@@ -41,6 +41,9 @@
               <option value="obviously_lies">Obviously Lies</option>
           </select>
 
+          <label for="rounds" class="label-inline">Number of Rounds</label>
+          <input type="number" id="rounds" class="input-control" min="1" value="5" />
+
           <div class="host-actions" style="margin-top:8px;">
             <button id="start-btn" class="small-btn">Start Game</button>
           </div>
@@ -109,7 +112,7 @@
   // When game starts → redirect to play (server sends mode info)
   socket.on("game_started", data => {
     // then redirect to the game page
-    const target = `/games/play?lobby=${encodeURIComponent(lobbyCode)}&username=${encodeURIComponent(username)}&mode=${encodeURIComponent(data.mode)}`;
+    const target = `/games/play?lobby=${encodeURIComponent(lobbyCode)}&username=${encodeURIComponent(username)}&mode=${encodeURIComponent(data.mode)}&rounds=${encodeURIComponent(data.rounds)}`;
     window.location.href = target;
   });
 
@@ -130,7 +133,8 @@
     startBtn.addEventListener("click", () => {
       startBtn.disabled = true;
       const selectedMode = document.getElementById("game_mode").value;
-      socket.emit("start_game", { lobbyCode, username, mode: selectedMode });
+      const rounds = document.getElementById("rounds").value;
+      socket.emit("start_game", { lobbyCode, username, mode: selectedMode, rounds: rounds });
     });
   }
 
