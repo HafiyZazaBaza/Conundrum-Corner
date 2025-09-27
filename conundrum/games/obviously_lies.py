@@ -119,8 +119,14 @@ class ObviouslyLiesGame:
             return {}
         # compute summary stats 
         summary = {
+            "game": "obviously_lies",
             "scores": game["scores"].copy(),
-            "votes": {ans: list(voters) for ans, voters in game["votes"].items()},
+            "details": {
+                "question": game["question"],
+                "correct_answer": game["correct_answer"],
+                "false_answers": game["false_answers"].copy(),
+                "votes": {ans: list(voters) for ans, voters in game["votes"].items()},
+            },
         }
         return summary
    

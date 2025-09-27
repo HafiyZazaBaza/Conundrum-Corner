@@ -130,3 +130,20 @@ def create_lobby():
     round_manager.setup_lobby(lobby_id, total_rounds=total_rounds)
 
     return jsonify({"success": True, "lobby_id": lobby_id})
+
+# --------------------------
+# Recap page
+# --------------------------
+@games_bp.route("/recap")
+def recap():
+    username = session.get("username")
+    if not username:
+        return redirect(url_for("home"))
+    return render_template("recap.html", username=username)
+
+from flask import jsonify
+
+@games_bp.route("/recap_data")
+def recap_data():
+    summary = session.get("recap_summary", {})
+    return jsonify(summary)

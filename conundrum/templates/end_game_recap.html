@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Game Recap</title>
+</head>
+<body>
+  <h1>End of Game Recap</h1>
+  <div id="recapData"></div>
+  <button onclick="window.location.href='/games/lobby'">Back to Lobby</button>
+
+  <script>
+    // Get recap data (stored from last round)
+    const recap = JSON.parse(localStorage.getItem("recapSummary") || "{}");
+
+    if (recap.scores) {
+      let html = "<h2>Scores</h2><ul>";
+      for (const [player, score] of Object.entries(recap.scores)) {
+        html += `<li>${player}: ${score} point${score !== 1 ? "s" : ""}</li>`;
+      }
+      html += "</ul>";
+      document.getElementById("recapData").innerHTML = html;
+    }
+
+    if (recap.votes) {
+      let html = "<h2>Votes</h2><ul>";
+      for (const [answer, voters] of Object.entries(recap.votes)) {
+        html += `<li>${answer} → voted by: ${voters.join(", ") || "nobody"}</li>`;
+      }
+      html += "</ul>";
+      document.getElementById("recapData").innerHTML += html;
+    }
+  </script>
+</body>
+</html>
